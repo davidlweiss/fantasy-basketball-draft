@@ -26,18 +26,22 @@ button.on{background:var(--acc);border-color:var(--acc);color:#fff}
 .combo .top{display:flex;justify-content:space-between;align-items:baseline;gap:8px}.combo .rk2{color:var(--mute);margin-right:8px}
 .combo ol{margin:6px 0 4px;padding-left:0;list-style:none;display:flex;flex-wrap:wrap;gap:4px 12px;font-size:13px}.combo ol li span{color:var(--mute);font-size:11px;margin-right:3px}
 .sw{font-size:12px;color:var(--mute);margin-top:6px}.sw b{color:var(--ink);font-weight:600}
+.sc2{display:flex;flex-direction:column;align-items:flex-end;gap:2px;font-variant-numeric:tabular-nums}
+.sc2 small{color:var(--mute);font-size:11px;font-weight:400}.sc2 b{font-size:15px}
+.chn{border-bottom:1px dashed var(--mute);cursor:help}
+#tip{position:fixed;z-index:9;display:none;max-width:320px;background:var(--ink);color:var(--bg);padding:8px 10px;border-radius:8px;font-size:12px;line-height:1.45;pointer-events:none}
 .ctl{display:flex;gap:8px;margin-top:10px}
 </style></head><body><main>
 <h1>Draft plan – __LEAGUE__ – first 6 picks</h1>
 <div class="slots" id="tabs"><button data-t="tree">Tree (pick by pick)</button><button data-t="top">Top combos per slot</button></div>
 <div id="treeview">
-<div class="sub">Pick your slot, then click the player you actually took. Children are ranked by expected categories won (of 9); gaps under ~0.1 are ties. If a player is gone, take the next one down.</div>
+<div class="sub">Pick your slot, then click the player you actually took. Options are ranked by "now" (categories won with the picks so far, of 9); gaps under ~0.1 are ties. If a player is gone, take the next one down.</div>
 <div class="slots" id="slots"></div>
 <div class="path" id="path"></div>
 <div id="head"></div>
-<div class="legend">Boxes = % of the 9 opponents your picks so far beat in each category, comparing your players against each opponent's same number of players. Nothing about later rounds is assumed. “Strong” = 70%+.</div>
+<div class="legend">Boxes = % of the 9 opponents your picks so far beat in each category, comparing your players against each opponent's same number of players. Nothing about later rounds is assumed. “Strong” = 70%+. <b>now</b> = categories won by the picks so far (out of 9). <b>chain</b> = categories won once the best completed chain of picks under that option is added (6 picks vs opponents' 6 picks); hover it to see the chain.</div>
 <div class="next" id="next"></div>
-<div id="kids"></div>
+<div id="kids"></div><div id="tip"></div>
 <div class="ctl"><button id="back">← Back</button><button id="reset">Reset</button></div>
 </div>
 <div id="topview" style="display:none">
@@ -49,6 +53,10 @@ const TREE=__TREE__;
 const TOP=__TOP__;
 const CATS=["FG%","FT%","3PM","PTS","REB","AST","STL","BLK","TO"];
 const strip=w=>`<span class="strip">${w.map((v,i)=>`<span class="cell${v>=60?' hi':''}" style="--v:${v}"><small>${CATS[i]}</small>${v}</span>`).join('')}</span>`;
+const best=n=>{if(n._b)return n._b;let b={leaf:n,path:[]};
+  if(n.k.length){b=null;for(const k of n.k){const r=best(k);if(!b||r.leaf.c>b.leaf.c)b={leaf:r.leaf,path:[k,...r.path]}}}
+  return n._b=b};
+const chainTip=(path,leaf,r)=>`<b>Best chain from here</b><br>${path.map((x,j)=>`R${r+j+1} #${TREE[slot].pick[r+j]} ${x.n}`).join('<br>')||'(this is the last pick)'}<br><br>6-pick win %: ${leaf.w.map((v,j)=>CATS[j]+' '+v).join(' · ')}`;
 const strong=w=>w.filter(v=>v>=70).length;
 const emph=g=>g.map((v,i)=>[v/10,CATS[i]]).filter(x=>x[0]<0).sort((a,b)=>a[0]-b[0]).slice(0,4).map(x=>x[1]+' '+x[0].toFixed(1)).join(', ')||'none';
 let slot=null,stack=[];
@@ -60,12 +68,16 @@ function render(){
   const picks=TREE[slot].pick;
   $('path').innerHTML=stack.map((n,i)=>`<span class="chip"><b>R${i+1} #${picks[i]}</b>${n.n}</span>`).join('');
   const cur=stack[stack.length-1];
-  $('head').innerHTML=`<div class="head"><b>Your picks so far</b> <span class="meta">· ${cur.c.toFixed(2)} cats · ${strong(cur.w)} strong</span>${strip(cur.w)}<div class="sw"><b>Emphasize next</b> (z vs par): ${emph(cur.g)}</div></div>`;
+  $('head').innerHTML=`<div class="head"><b>Your picks so far</b> <span class="meta">· ${cur.c.toFixed(2)} cats · ${strong(cur.w)} strong</span>${strip(cur.w)}<div class="sw"><b>Emphasize next</b> (z vs par): ${emph(cur.g)}</div>${cur.k.length?`<div class="sw"><b>Best chain from here:</b> ${best(cur).path.map(x=>x.n).join(' → ')} <span class="meta">(${best(cur).leaf.c.toFixed(2)} cats at 6 picks)</span></div>`:''}</div>`;
   if(!cur.k.length){$('next').textContent='Six picks done. Use next_pick.py from here.';$('kids').innerHTML='';return}
   const r=stack.length;
   $('next').textContent=`Round ${r+1}, pick #${picks[r]} – options, best first:`;
   const mx=Math.max(...cur.k.map(k=>k.c));
-  $('kids').innerHTML=cur.k.map((k,i)=>`<button class="row" data-i="${i}"><span class="bar" style="width:${Math.max(8,100*k.c/mx)}%"></span><span class="rk">${i+1}</span><span><span class="nm">${k.n}</span><br><span class="meta">ADP ${k.adp} · ${strong(k.w)} strong cats</span></span><span class="sc">${k.c.toFixed(2)}</span>${strip(k.w)}</button>`).join('');
+  $('kids').innerHTML=cur.k.map((k,i)=>`<button class="row" data-i="${i}"><span class="bar" style="width:${Math.max(8,100*k.c/mx)}%"></span><span class="rk">${i+1}</span><span><span class="nm">${k.n}</span><br><span class="meta">ADP ${k.adp} · ${strong(k.w)} strong cats</span></span><span class="sc2"><span><b>${k.c.toFixed(2)}</b> <small>now</small></span><span class="chn"><b>${best(k).leaf.c.toFixed(2)}</b> <small>chain</small></span></span>${strip(k.w)}</button>`).join('');
+  const tip=$('tip');
+  $('kids').querySelectorAll('.chn').forEach(el=>{const i=+el.closest('.row').dataset.i;
+    el.onmouseenter=e=>{const b=best(cur.k[i]);tip.innerHTML=chainTip(b.path,b.leaf,r+1);tip.style.display='block';const q=el.getBoundingClientRect();tip.style.left=Math.max(8,q.right-tip.offsetWidth)+'px';tip.style.top=(q.bottom+6)+'px'};
+    el.onmouseleave=()=>tip.style.display='none'});
   $('kids').querySelectorAll('button').forEach(b=>b.onclick=()=>{stack.push(cur.k[+b.dataset.i]);render()});
 }
 $('back').onclick=()=>{if(stack.length>1){stack.pop();render()}};
