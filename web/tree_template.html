@@ -35,13 +35,13 @@ button.on{background:var(--acc);border-color:var(--acc);color:#fff}
 <div class="slots" id="slots"></div>
 <div class="path" id="path"></div>
 <div id="head"></div>
-<div class="legend">Each box = projected % of the 9 opponents you beat in that category at the END of the draft, assuming these picks and then the best fill for the other rounds. It is not the stats of the players picked so far. “Strong” = 70%+.</div>
+<div class="legend">Boxes = % of the 9 opponents your picks so far beat in each category, comparing your players against each opponent's same number of players. Nothing about later rounds is assumed. “Strong” = 70%+.</div>
 <div class="next" id="next"></div>
 <div id="kids"></div>
 <div class="ctl"><button id="back">← Back</button><button id="reset">Reset</button></div>
 </div>
 <div id="topview" style="display:none">
-<div class="sub">The 10 best full 6-pick combos for each slot, re-scored on fresh simulated drafts. Boxes show the projected % of opponents you beat per category for the full 13-man team (these 6 picks, then the best fill).</div>
+<div class="sub">The 10 best 6-pick combos for each slot, ranked on the 6 picks alone (vs opponents' first 6 picks), re-scored on fresh simulated drafts. “Emphasize later” = categories where the 6 players sit furthest behind an average team after 6 rounds; the typical fill is guidance only and does not affect the ranking.</div>
 <div class="slots" id="tslots"></div><div id="combos"></div></div>
 </main>
 <script>
@@ -50,6 +50,7 @@ const TOP=__TOP__;
 const CATS=["FG%","FT%","3PM","PTS","REB","AST","STL","BLK","TO"];
 const strip=w=>`<span class="strip">${w.map((v,i)=>`<span class="cell${v>=60?' hi':''}" style="--v:${v}"><small>${CATS[i]}</small>${v}</span>`).join('')}</span>`;
 const strong=w=>w.filter(v=>v>=70).length;
+const emph=g=>g.map((v,i)=>[v/10,CATS[i]]).filter(x=>x[0]<0).sort((a,b)=>a[0]-b[0]).slice(0,4).map(x=>x[1]+' '+x[0].toFixed(1)).join(', ')||'none';
 let slot=null,stack=[];
 const $=id=>document.getElementById(id);
 function render(){
@@ -59,7 +60,7 @@ function render(){
   const picks=TREE[slot].pick;
   $('path').innerHTML=stack.map((n,i)=>`<span class="chip"><b>R${i+1} #${picks[i]}</b>${n.n}</span>`).join('');
   const cur=stack[stack.length-1];
-  $('head').innerHTML=`<div class="head"><b>Projected final team</b> <span class="meta">(these picks + best fill)</span> <span class="meta">· ${cur.c.toFixed(2)} cats · ${strong(cur.w)} strong</span>${strip(cur.w)}</div>`;
+  $('head').innerHTML=`<div class="head"><b>Your picks so far</b> <span class="meta">· ${cur.c.toFixed(2)} cats · ${strong(cur.w)} strong</span>${strip(cur.w)}<div class="sw"><b>Emphasize next</b> (z vs par): ${emph(cur.g)}</div></div>`;
   if(!cur.k.length){$('next').textContent='Six picks done. Use next_pick.py from here.';$('kids').innerHTML='';return}
   const r=stack.length;
   $('next').textContent=`Round ${r+1}, pick #${picks[r]} – options, best first:`;
@@ -80,7 +81,10 @@ function renderTop(){
     const weakL=st.filter(x=>x[0]<50).sort((a,b)=>a[0]-b[0]).map(x=>x[1]+' '+x[0]).join(', ')||'none';
     return `<div class="combo"><div class="top"><span><span class="rk2">#${i+1}</span><b>${c.names[0]}</b> anchor</span><span class="sc">${c.c.toFixed(2)} <span class="meta">±${c.se.toFixed(2)}</span></span></div>
     <ol>${c.names.map((n,j)=>`<li><span>R${j+1} #${d.pick[j]}</span>${n}</li>`).join('')}</ol>${strip(c.w)}
-    <div class="sw"><b>Strong:</b> ${strongL} &nbsp;·&nbsp; <b>Weak (&lt;50):</b> ${weakL}</div></div>`}).join('');
+    <div class="sw"><b>Strong:</b> ${strongL} &nbsp;·&nbsp; <b>Weak (&lt;50):</b> ${weakL}</div>
+    <div class="sw"><b>Emphasize later</b> (z vs par): ${emph(c.g)}</div>
+    <div class="sw"><b>Typical fill</b> (guidance): ${c.fill.map(f=>`R${f.r} #${f.pick} ${f.t.map(t=>t[0]+' '+t[1]+'%').join(' / ')}`).join(' · ')}</div>
+    <div class="sw">If you then fill like that, projected final win %: ${c.fw.map((v,j)=>CATS[j]+' '+v).join(' · ')}</div></div>`}).join('');
 }
 function showTab(t){
   $('treeview').style.display=t=='tree'?'':'none';$('topview').style.display=t=='top'?'':'none';

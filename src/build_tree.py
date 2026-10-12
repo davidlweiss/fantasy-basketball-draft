@@ -2,9 +2,10 @@
 Anchors = the top `teams` players by ADP (never do_not_draft); anchor k is what you take at slot k in round 1.
 Every node gets up to BRANCH children for the next round, ranked 1..BRANCH:
   feasible = still plausibly on the board at that pick (window rule from draftlib, `reach` rule, top-`pool` players,
-  never do_not_draft / first_four_exclude). The best K_CAND by Fit are scored by simulating the rest of the draft
-  (your picks so far forced, then the usual Fit rule) on shared random draws; the top BRANCH become children.
-  Node 'c' = expected categories won (of 9) for the path to that node; 'w' = % of opponents beaten in each of the 9 categories (CATS order). Gaps under ~0.1 are ties.
+  never do_not_draft / first_four_exclude). The best K_CAND by Fit are scored by simulating the draft only up to that round
+  (opponents draft by ADP + noise; same random draws for every candidate) -- the rest of your draft is NOT simulated; the top BRANCH become children.
+  Node 'c' = categories won (of 9) by the picks so far vs opponents' rosters of the same size (no later picks assumed);
+  'w' = % of opponents beaten in each category (CATS order); 'g' = 10 x (avg z of your picks - par for that many picks). Gaps under ~0.1 are ties.
   BRANCH=5 over rounds 2-6 -> 3,125 leaf paths per anchor, 31,250 in all.
 Run: python src/build_tree.py            (all anchors, ~20-30 min)
      python src/build_tree.py 1 6        (just those slots)
@@ -16,7 +17,7 @@ from draftlib import *
 
 LV = CFG.get("plan_rounds", 6)
 QUICK = "--quick" in sys.argv
-BRANCH, K_CAND, NS = (2, 5, 6) if QUICK else (5, 16, 24)
+BRANCH, K_CAND, NS = (2, 5, 6) if QUICK else (5, 20, 40)
 BLOCK = DND.copy()
 for n in CFG.get("first_four_exclude", []): BLOCK[IDX[n]] = True
 ANCHORS = [p for p in ORDER if not DND[p]][:T]                      # slot k (1-based) -> ANCHORS[k-1]
@@ -30,12 +31,14 @@ def candidates(s, seq):
     return cand[:K_CAND]
 
 def evaluate(s, seq, noises):
-    """Per-category share of the 9 opponents beaten, averaged over the shared draws."""
-    return np.mean([play(s, nz, forced=seq)[0] for nz in noises], axis=0)
+    """Per-category share of the 9 opponents your picks-so-far roster beats, vs their rosters of the same size
+    (play_prefix). Independent of whatever you would draft later."""
+    return np.mean([play_prefix(s, nz, seq) for nz in noises], axis=0)
 
 def build(s, seq, noises, win):
     node = dict(n=NAMES[seq[-1]], adp=round(float(ADP[seq[-1]]), 1), c=round(float(win.sum()), 2),
-                w=[int(round(100 * x)) for x in win], k=[])
+                w=[int(round(100 * x)) for x in win],
+                g=[int(round(10 * x)) for x in Z[list(seq)].mean(0) - PAR[len(seq)]], k=[])
     if len(seq) == LV: return node
     scored = sorted(((evaluate(s, seq + (p,), noises), p) for p in candidates(s, seq)),
                     key=lambda t: -t[0].sum())[:BRANCH]

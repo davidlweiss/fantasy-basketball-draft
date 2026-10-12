@@ -26,3 +26,11 @@ First four: enumerate every reachable 4-player set assuming others take best ADP
 ## Files
 - `src/draftlib.py` model + simulator; `web/*_template.html` page sources; `data/`, `results/`, `dist/` as above.
 - Note: published board data now labels the five R1-2 targets (Jokic, Tatum, Edwards, Mitchell, Haliburton) as "1-2" (previously "null").
+
+## 6-pick planner (tree + top combos)
+- `python src/build_tree.py` -> `results/tree.json`: top-10-ADP anchors (slot k = k-th by ADP), 5 ranked children per node for rounds 2-6 (3,125 paths/anchor).
+- `python src/build_top.py` -> `results/top.json`: best 10 combos per slot, re-scored on fresh draws.
+- `python src/build_pages.py` also writes `dist/draft-tree.html` (tree + top-combos tabs).
+- Ranking uses ONLY the picks made so far (`play_prefix`: your k players vs each opponent's k players, win % per category). Later rounds are not assumed. "Emphasize later" = categories where your players sit furthest behind par; "typical fill" is guidance from simulating the Fit rule and does not affect ranking.
+- `do_not_draft` (config) = players you never pick; opponents still take them.
+- `results/plan6.json` / `build_plan6.py` is an earlier beam-search version (ranked with an assumed fill).

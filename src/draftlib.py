@@ -98,3 +98,21 @@ def play(slot, noise, forced=(), punts=(), reach=REACH):
     cats = np.array([team_cats(tot[t]) for t in range(T)]) * SIGN
     mine = cats[me]; oth = np.delete(cats, me, 0)
     return ((mine > oth) + 0.5 * (mine == oth)).mean(0), picks
+
+def play_prefix(slot, noise, forced):
+    """Draft only as far as your forced picks go (len(forced) rounds). Opponents take the lowest (ADP + noise) player.
+    Returns the share of the 9 opponents your forced-pick roster beats in each category, comparing equal-size rosters
+    (your k players vs each opponent's k players). Nothing after your last forced pick is assumed."""
+    me = slot - 1; L = len(forced)
+    avail = np.ones(N, bool); reserved = np.zeros(N, bool); reserved[list(forced)] = True
+    tot = np.zeros((T, 11)); cnt = 0
+    for r in range(L):
+        for t in (range(T) if r % 2 == 0 else range(T - 1, -1, -1)):
+            if t == me:
+                p = forced[cnt]; reserved[p] = False; cnt += 1
+            else:
+                k = ADP + noise[t]; k[~avail | reserved] = 1e9; p = int(np.argmin(k))
+            avail[p] = False; tot[t] += S[p]
+    cats = np.array([team_cats(tot[t]) for t in range(T)]) * SIGN
+    mine = cats[me]; oth = np.delete(cats, me, 0)
+    return ((mine > oth) + 0.5 * (mine == oth)).mean(0)
