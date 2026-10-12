@@ -22,9 +22,15 @@ button.on{background:var(--acc);border-color:var(--acc);color:#fff}
 .cell small{display:block;font-size:9px;opacity:.75}.cell.hi{color:#fff}
 .head{background:var(--card);border:1px solid var(--line);border-radius:8px;padding:8px 10px;margin-bottom:10px}
 .head .strip{margin:4px 0 0}.legend{color:var(--mute);font-size:12px;margin:4px 0 10px}
+.combo{background:var(--card);border:1px solid var(--line);border-radius:8px;padding:10px 12px;margin-bottom:8px}
+.combo .top{display:flex;justify-content:space-between;align-items:baseline;gap:8px}.combo .rk2{color:var(--mute);margin-right:8px}
+.combo ol{margin:6px 0 4px;padding-left:0;list-style:none;display:flex;flex-wrap:wrap;gap:4px 12px;font-size:13px}.combo ol li span{color:var(--mute);font-size:11px;margin-right:3px}
+.sw{font-size:12px;color:var(--mute);margin-top:6px}.sw b{color:var(--ink);font-weight:600}
 .ctl{display:flex;gap:8px;margin-top:10px}
 </style></head><body><main>
-<h1>Draft tree – first 6 picks</h1>
+<h1>Draft plan – first 6 picks</h1>
+<div class="slots" id="tabs"><button data-t="tree">Tree (pick by pick)</button><button data-t="top">Top combos per slot</button></div>
+<div id="treeview">
 <div class="sub">Pick your slot, then click the player you actually took. Children are ranked by expected categories won (of 9); gaps under ~0.1 are ties. If a player is gone, take the next one down.</div>
 <div class="slots" id="slots"></div>
 <div class="path" id="path"></div>
@@ -33,9 +39,14 @@ button.on{background:var(--acc);border-color:var(--acc);color:#fff}
 <div class="next" id="next"></div>
 <div id="kids"></div>
 <div class="ctl"><button id="back">← Back</button><button id="reset">Reset</button></div>
+</div>
+<div id="topview" style="display:none">
+<div class="sub">The 10 best full 6-pick combos for each slot, re-scored on fresh simulated drafts. Boxes show the % of opponents you beat per category (darker = stronger).</div>
+<div class="slots" id="tslots"></div><div id="combos"></div></div>
 </main>
 <script>
 const TREE=__TREE__;
+const TOP=__TOP__;
 const CATS=["FG%","FT%","3PM","PTS","REB","AST","STL","BLK","TO"];
 const strip=w=>`<span class="strip">${w.map((v,i)=>`<span class="cell${v>=60?' hi':''}" style="--v:${v}"><small>${CATS[i]}</small>${v}</span>`).join('')}</span>`;
 const strong=w=>w.filter(v=>v>=70).length;
@@ -58,5 +69,25 @@ function render(){
 }
 $('back').onclick=()=>{if(stack.length>1){stack.pop();render()}};
 $('reset').onclick=()=>{slot=null;stack=[];render()};
+let tslot="1";
+function renderTop(){
+  $('tslots').innerHTML=Object.keys(TOP).sort((a,b)=>a-b).map(k=>`<button class="${k==tslot?'on':''}" data-s="${k}">Slot ${k}</button>`).join('');
+  $('tslots').querySelectorAll('button').forEach(b=>b.onclick=()=>{tslot=b.dataset.s;renderTop()});
+  const d=TOP[tslot];
+  $('combos').innerHTML=d.top.map((c,i)=>{
+    const st=c.w.map((v,j)=>[v,CATS[j]]);
+    const strongL=st.filter(x=>x[0]>=70).sort((a,b)=>b[0]-a[0]).map(x=>x[1]+' '+x[0]).join(', ')||'none';
+    const weakL=st.filter(x=>x[0]<50).sort((a,b)=>a[0]-b[0]).map(x=>x[1]+' '+x[0]).join(', ')||'none';
+    return `<div class="combo"><div class="top"><span><span class="rk2">#${i+1}</span><b>${c.names[0]}</b> anchor</span><span class="sc">${c.c.toFixed(2)} <span class="meta">±${c.se.toFixed(2)}</span></span></div>
+    <ol>${c.names.map((n,j)=>`<li><span>R${j+1} #${d.pick[j]}</span>${n}</li>`).join('')}</ol>${strip(c.w)}
+    <div class="sw"><b>Strong:</b> ${strongL} &nbsp;·&nbsp; <b>Weak (&lt;50):</b> ${weakL}</div></div>`}).join('');
+}
+function showTab(t){
+  $('treeview').style.display=t=='tree'?'':'none';$('topview').style.display=t=='top'?'':'none';
+  document.querySelectorAll('#tabs button').forEach(b=>b.classList.toggle('on',b.dataset.t==t));
+  if(t=='top')renderTop();
+}
+document.querySelectorAll('#tabs button').forEach(b=>b.onclick=()=>showTab(b.dataset.t));
+showTab('tree');
 render();
 </script></body></html>

@@ -18,6 +18,8 @@ slim = {s: {"total": d["total"], "top": [{k: t[k] for k in ("names", "adp", "pic
 pg = rd("web", "plans_template.html").replace("__PLANS__", json.dumps(plans, separators=(",", ":"))).replace("__FOUR__", json.dumps(slim, separators=(",", ":")))
 open(os.path.join(ROOT, "dist", "draft-plans.html"), "w", encoding="utf-8").write(pg)
 tp = os.path.join(ROOT, "results", "tree.json")
+top_p = os.path.join(ROOT, "results", "top.json")
 if os.path.exists(tp):
-    open(os.path.join(ROOT, "dist", "draft-tree.html"), "w", encoding="utf-8").write(rd("web", "tree_template.html").replace("__TREE__", open(tp).read()))
+    html = rd("web", "tree_template.html").replace("__TREE__", open(tp).read()).replace("__TOP__", open(top_p).read() if os.path.exists(top_p) else "{}")
+    open(os.path.join(ROOT, "dist", "draft-tree.html"), "w", encoding="utf-8").write(html)
 print("built dist/draft-board.html, dist/draft-plans.html, dist/draft-tree.html")
