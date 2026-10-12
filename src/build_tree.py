@@ -4,7 +4,7 @@ Every node gets up to BRANCH children for the next round, ranked 1..BRANCH:
   feasible = still plausibly on the board at that pick (window rule from draftlib, `reach` rule, top-`pool` players,
   never do_not_draft / first_four_exclude). The best K_CAND by Fit are scored by simulating the rest of the draft
   (your picks so far forced, then the usual Fit rule) on shared random draws; the top BRANCH become children.
-  Node 'c' = expected categories won (of 9) for the path to that node. Gaps under ~0.1 are ties.
+  Node 'c' = expected categories won (of 9) for the path to that node; 'w' = % of opponents beaten in each of the 9 categories (CATS order). Gaps under ~0.1 are ties.
   BRANCH=5 over rounds 2-6 -> 3,125 leaf paths per anchor, 31,250 in all.
 Run: python src/build_tree.py            (all anchors, ~20-30 min)
      python src/build_tree.py 1 6        (just those slots)
@@ -29,18 +29,23 @@ def candidates(s, seq):
     cand.sort(key=lambda p: -(Z[p] @ w))
     return cand[:K_CAND]
 
-def build(s, seq, noises, score):
-    node = dict(n=NAMES[seq[-1]], adp=round(float(ADP[seq[-1]]), 1), c=round(score, 2), k=[])
+def evaluate(s, seq, noises):
+    """Per-category share of the 9 opponents beaten, averaged over the shared draws."""
+    return np.mean([play(s, nz, forced=seq)[0] for nz in noises], axis=0)
+
+def build(s, seq, noises, win):
+    node = dict(n=NAMES[seq[-1]], adp=round(float(ADP[seq[-1]]), 1), c=round(float(win.sum()), 2),
+                w=[int(round(100 * x)) for x in win], k=[])
     if len(seq) == LV: return node
-    scored = sorted(((float(np.mean([play(s, nz, forced=seq + (p,))[0].sum() for nz in noises])), p)
-                     for p in candidates(s, seq)), reverse=True)[:BRANCH]
+    scored = sorted(((evaluate(s, seq + (p,), noises), p) for p in candidates(s, seq)),
+                    key=lambda t: -t[0].sum())[:BRANCH]
     node["k"] = [build(s, seq + (p,), noises, v) for v, p in scored]
     return node
 
 def run_slot(s):
     t0 = time.time(); a = ANCHORS[s - 1]
     noises = [np.random.default_rng(10000 * s + i).normal(size=(T, N)) * (SIG0 if i % 2 == 0 else SIG2) for i in range(NS)]
-    c0 = float(np.mean([play(s, nz, forced=(a,))[0].sum() for nz in noises]))
+    c0 = evaluate(s, (a,), noises)
     tree = build(s, (a,), noises, c0)
     return s, dict(pick=pick_numbers(s, LV), tree=tree, secs=round(time.time() - t0))
 

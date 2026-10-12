@@ -17,32 +17,43 @@ button.on{background:var(--acc);border-color:var(--acc);color:#fff}
 .row{display:grid;grid-template-columns:24px 1fr auto;gap:10px;align-items:center;width:100%;text-align:left;margin-bottom:8px;padding:10px 12px;position:relative;overflow:hidden}
 .row .bar{position:absolute;left:0;top:0;bottom:0;background:var(--bar);opacity:.35}
 .row>*{position:relative}.rk{color:var(--mute)}.nm{font-weight:600}.meta{color:var(--mute);font-size:12px}.sc{font-variant-numeric:tabular-nums;font-weight:600}
+.strip{grid-column:2/4;display:grid;grid-template-columns:repeat(9,1fr);gap:3px;margin-top:6px}
+.cell{border-radius:4px;padding:2px 0;text-align:center;font-size:11px;line-height:1.2;background:color-mix(in srgb,var(--acc) calc(var(--v)*1%),var(--line));color:var(--ink)}
+.cell small{display:block;font-size:9px;opacity:.75}.cell.hi{color:#fff}
+.head{background:var(--card);border:1px solid var(--line);border-radius:8px;padding:8px 10px;margin-bottom:10px}
+.head .strip{margin:4px 0 0}.legend{color:var(--mute);font-size:12px;margin:4px 0 10px}
 .ctl{display:flex;gap:8px;margin-top:10px}
 </style></head><body><main>
 <h1>Draft tree – first 6 picks</h1>
 <div class="sub">Pick your slot, then click the player you actually took. Children are ranked by expected categories won (of 9); gaps under ~0.1 are ties. If a player is gone, take the next one down.</div>
 <div class="slots" id="slots"></div>
 <div class="path" id="path"></div>
+<div id="head"></div>
+<div class="legend">Each box = % of the 9 opponents you beat in that category (darker = stronger). “Strong” = 70%+.</div>
 <div class="next" id="next"></div>
 <div id="kids"></div>
 <div class="ctl"><button id="back">← Back</button><button id="reset">Reset</button></div>
 </main>
 <script>
 const TREE=__TREE__;
+const CATS=["FG%","FT%","3PM","PTS","REB","AST","STL","BLK","TO"];
+const strip=w=>`<span class="strip">${w.map((v,i)=>`<span class="cell${v>=60?' hi':''}" style="--v:${v}"><small>${CATS[i]}</small>${v}</span>`).join('')}</span>`;
+const strong=w=>w.filter(v=>v>=70).length;
 let slot=null,stack=[];
 const $=id=>document.getElementById(id);
 function render(){
   $('slots').innerHTML=Object.keys(TREE).sort((a,b)=>a-b).map(s=>`<button class="${s==slot?'on':''}" data-s="${s}">Slot ${s} · ${TREE[s].tree.n}</button>`).join('');
   $('slots').querySelectorAll('button').forEach(b=>b.onclick=()=>{slot=b.dataset.s;stack=[TREE[slot].tree];render()});
-  if(!slot){$('path').innerHTML='';$('next').textContent='Choose a draft slot.';$('kids').innerHTML='';return}
+  if(!slot){$('head').innerHTML='';$('path').innerHTML='';$('next').textContent='Choose a draft slot.';$('kids').innerHTML='';return}
   const picks=TREE[slot].pick;
   $('path').innerHTML=stack.map((n,i)=>`<span class="chip"><b>R${i+1} #${picks[i]}</b>${n.n}</span>`).join('');
   const cur=stack[stack.length-1];
+  $('head').innerHTML=`<div class="head"><b>Your team so far</b> <span class="meta">· ${cur.c.toFixed(2)} cats · ${strong(cur.w)} strong</span>${strip(cur.w)}</div>`;
   if(!cur.k.length){$('next').textContent='Six picks done. Use next_pick.py from here.';$('kids').innerHTML='';return}
   const r=stack.length;
   $('next').textContent=`Round ${r+1}, pick #${picks[r]} – options, best first:`;
   const mx=Math.max(...cur.k.map(k=>k.c));
-  $('kids').innerHTML=cur.k.map((k,i)=>`<button class="row" data-i="${i}"><span class="bar" style="width:${Math.max(8,100*k.c/mx)}%"></span><span class="rk">${i+1}</span><span><span class="nm">${k.n}</span><br><span class="meta">ADP ${k.adp}</span></span><span class="sc">${k.c.toFixed(2)}</span></button>`).join('');
+  $('kids').innerHTML=cur.k.map((k,i)=>`<button class="row" data-i="${i}"><span class="bar" style="width:${Math.max(8,100*k.c/mx)}%"></span><span class="rk">${i+1}</span><span><span class="nm">${k.n}</span><br><span class="meta">ADP ${k.adp} · ${strong(k.w)} strong cats</span></span><span class="sc">${k.c.toFixed(2)}</span>${strip(k.w)}</button>`).join('');
   $('kids').querySelectorAll('button').forEach(b=>b.onclick=()=>{stack.push(cur.k[+b.dataset.i]);render()});
 }
 $('back').onclick=()=>{if(stack.length>1){stack.pop();render()}};
