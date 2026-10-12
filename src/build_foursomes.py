@@ -20,13 +20,6 @@ BLOCK = DND.copy()
 for i in EXCL: BLOCK[i] = True
 PN = lambda s: pick_numbers(s, 4)
 
-def window_start(pickno, j, mine):
-    m = pickno - 1 - j; cnt = 0; r = 0
-    while cnt < m:
-        if ORDER[r] not in mine: cnt += 1
-        r += 1
-    return r
-
 def enumerate_sets(s):
     P = PN(s); best = {}
     def rec(j, mine, pen):

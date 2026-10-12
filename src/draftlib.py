@@ -10,7 +10,10 @@ _d = json.load(open(os.path.join(ROOT, "data", "players.json")))["p"]
 NAMES = [r[0] for r in _d]
 RK = np.array([r[1] for r in _d], float)
 ADP = np.array([r[3] if r[3] is not None else 250 for r in _d], float)
-DND = np.array([bool(r[4]) for r in _d])               # 'Do not draft' column in the sheet: never picked by you
+DND = np.array([bool(r[4]) for r in _d])               # 'Do not draft' column in the sheet + config do_not_draft: never picked by you
+_bad = [n for n in CFG.get("do_not_draft", []) if n not in NAMES]
+if _bad: raise SystemExit(f"do_not_draft names not found in players.json: {_bad}")
+for _n in CFG.get("do_not_draft", []): DND[NAMES.index(_n)] = True
 FGM = np.array([r[5] for r in _d]); FGA = np.array([r[6] for r in _d])
 FTM = np.array([r[7] for r in _d]); FTA = np.array([r[8] for r in _d])
 C = np.array([r[9:16] for r in _d], float)             # 3PM PTS REB AST STL BLK TO
@@ -40,6 +43,15 @@ S = np.column_stack([FGM, FGA, FTM, FTA, C])                       # per-player 
 SIGN = np.array([1, 1, 1, 1, 1, 1, 1, 1, -1])
 SIG0 = 2 + 0.12 * np.minimum(ADP, 200)                             # 'tight' opponents: ADP + modest noise
 SIG2 = 4 + 0.25 * np.minimum(ADP, 200)                             # 'loose' opponents: roughly double the noise
+
+def window_start(pickno, j, mine):
+    """Index in ORDER of the best-ADP player still plausibly on the board at your j-th pick (0-based):
+    the (pickno - 1 - j) picks made by others are assumed to be the best-ADP players not in `mine`."""
+    m = pickno - 1 - j; cnt = 0; r = 0
+    while cnt < m:
+        if ORDER[r] not in mine: cnt += 1
+        r += 1
+    return r
 
 def pick_numbers(slot, rounds=K):
     return [r * T + slot if r % 2 == 0 else (r + 1) * T - slot + 1 for r in range(rounds)]

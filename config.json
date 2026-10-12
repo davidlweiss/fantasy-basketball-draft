@@ -4,14 +4,18 @@
   "pool": 130,
   "first_rounds": 4,
   "reach": 10,
+  "plan_rounds": 6,
   "xlsx": "data/fntsy_2026-2027.xlsx",
+  "do_not_draft": ["Anthony Davis", "Kevin Durant", "Stephen Curry", "Kawhi Leonard"],
   "first_four_exclude": [],
   "_notes": {
     "teams": "League size. Used for par and for the snake draft order.",
     "rounds": "Roster spots per team (13 x 10 teams = 130 drafted players).",
     "pool": "z-scores use the mean and spread of the top N players by projected rank.",
     "first_rounds": "How many early picks count as 'the first four'.",
+    "plan_rounds": "How many early picks build_plan6.py plans (beam search).",
     "reach": "Max picks past a player's ADP you may take him (first four and later picks).",
+    "do_not_draft": "Players you will never draft (opponents still take them). Added to the sheet's Do-not-draft column. Exact names from data/players.json.",
     "first_four_exclude": "Names that may NOT be picked in the first picks (still allowed later). Must match names in data/players.json exactly."
   }
 }
