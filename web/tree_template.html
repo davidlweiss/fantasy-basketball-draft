@@ -1,0 +1,51 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Draft Tree</title>
+<style>
+:root{--bg:#f6f7f9;--card:#fff;--ink:#14181f;--mute:#6b7380;--line:#e1e4ea;--acc:#1f6feb;--bar:#9ec1ff}
+@media(prefers-color-scheme:dark){:root{--bg:#12151a;--card:#1b1f27;--ink:#e8ebf0;--mute:#8d96a5;--line:#2c323d;--acc:#5b9bff;--bar:#2c4f86}}
+*{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--ink);font:15px/1.4 system-ui,sans-serif}
+main{max-width:760px;margin:0 auto;padding:16px}
+h1{font-size:18px;margin:0 0 4px}.sub{color:var(--mute);font-size:13px;margin-bottom:12px}
+.slots{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:14px}
+button{font:inherit;color:inherit;background:var(--card);border:1px solid var(--line);border-radius:8px;padding:6px 10px;cursor:pointer}
+button.on{background:var(--acc);border-color:var(--acc);color:#fff}
+.path{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:12px}
+.chip{background:var(--card);border:1px solid var(--line);border-radius:999px;padding:3px 10px;font-size:13px}
+.chip b{color:var(--mute);font-weight:500;margin-right:4px}
+.next{color:var(--mute);font-size:13px;margin:8px 0}
+.row{display:grid;grid-template-columns:24px 1fr auto;gap:10px;align-items:center;width:100%;text-align:left;margin-bottom:8px;padding:10px 12px;position:relative;overflow:hidden}
+.row .bar{position:absolute;left:0;top:0;bottom:0;background:var(--bar);opacity:.35}
+.row>*{position:relative}.rk{color:var(--mute)}.nm{font-weight:600}.meta{color:var(--mute);font-size:12px}.sc{font-variant-numeric:tabular-nums;font-weight:600}
+.ctl{display:flex;gap:8px;margin-top:10px}
+</style></head><body><main>
+<h1>Draft tree – first 6 picks</h1>
+<div class="sub">Pick your slot, then click the player you actually took. Children are ranked by expected categories won (of 9); gaps under ~0.1 are ties. If a player is gone, take the next one down.</div>
+<div class="slots" id="slots"></div>
+<div class="path" id="path"></div>
+<div class="next" id="next"></div>
+<div id="kids"></div>
+<div class="ctl"><button id="back">← Back</button><button id="reset">Reset</button></div>
+</main>
+<script>
+const TREE=__TREE__;
+let slot=null,stack=[];
+const $=id=>document.getElementById(id);
+function render(){
+  $('slots').innerHTML=Object.keys(TREE).sort((a,b)=>a-b).map(s=>`<button class="${s==slot?'on':''}" data-s="${s}">Slot ${s} · ${TREE[s].tree.n}</button>`).join('');
+  $('slots').querySelectorAll('button').forEach(b=>b.onclick=()=>{slot=b.dataset.s;stack=[TREE[slot].tree];render()});
+  if(!slot){$('path').innerHTML='';$('next').textContent='Choose a draft slot.';$('kids').innerHTML='';return}
+  const picks=TREE[slot].pick;
+  $('path').innerHTML=stack.map((n,i)=>`<span class="chip"><b>R${i+1} #${picks[i]}</b>${n.n}</span>`).join('');
+  const cur=stack[stack.length-1];
+  if(!cur.k.length){$('next').textContent='Six picks done. Use next_pick.py from here.';$('kids').innerHTML='';return}
+  const r=stack.length;
+  $('next').textContent=`Round ${r+1}, pick #${picks[r]} – options, best first:`;
+  const mx=Math.max(...cur.k.map(k=>k.c));
+  $('kids').innerHTML=cur.k.map((k,i)=>`<button class="row" data-i="${i}"><span class="bar" style="width:${Math.max(8,100*k.c/mx)}%"></span><span class="rk">${i+1}</span><span><span class="nm">${k.n}</span><br><span class="meta">ADP ${k.adp}</span></span><span class="sc">${k.c.toFixed(2)}</span></button>`).join('');
+  $('kids').querySelectorAll('button').forEach(b=>b.onclick=()=>{stack.push(cur.k[+b.dataset.i]);render()});
+}
+$('back').onclick=()=>{if(stack.length>1){stack.pop();render()}};
+$('reset').onclick=()=>{slot=null;stack=[];render()};
+render();
+</script></body></html>
