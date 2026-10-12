@@ -35,13 +35,13 @@ button.on{background:var(--acc);border-color:var(--acc);color:#fff}
 <div class="slots" id="slots"></div>
 <div class="path" id="path"></div>
 <div id="head"></div>
-<div class="legend">Each box = % of the 9 opponents you beat in that category (darker = stronger). “Strong” = 70%+.</div>
+<div class="legend">Each box = projected % of the 9 opponents you beat in that category at the END of the draft, assuming these picks and then the best fill for the other rounds. It is not the stats of the players picked so far. “Strong” = 70%+.</div>
 <div class="next" id="next"></div>
 <div id="kids"></div>
 <div class="ctl"><button id="back">← Back</button><button id="reset">Reset</button></div>
 </div>
 <div id="topview" style="display:none">
-<div class="sub">The 10 best full 6-pick combos for each slot, re-scored on fresh simulated drafts. Boxes show the % of opponents you beat per category (darker = stronger).</div>
+<div class="sub">The 10 best full 6-pick combos for each slot, re-scored on fresh simulated drafts. Boxes show the projected % of opponents you beat per category for the full 13-man team (these 6 picks, then the best fill).</div>
 <div class="slots" id="tslots"></div><div id="combos"></div></div>
 </main>
 <script>
@@ -59,7 +59,7 @@ function render(){
   const picks=TREE[slot].pick;
   $('path').innerHTML=stack.map((n,i)=>`<span class="chip"><b>R${i+1} #${picks[i]}</b>${n.n}</span>`).join('');
   const cur=stack[stack.length-1];
-  $('head').innerHTML=`<div class="head"><b>Your team so far</b> <span class="meta">· ${cur.c.toFixed(2)} cats · ${strong(cur.w)} strong</span>${strip(cur.w)}</div>`;
+  $('head').innerHTML=`<div class="head"><b>Projected final team</b> <span class="meta">(these picks + best fill)</span> <span class="meta">· ${cur.c.toFixed(2)} cats · ${strong(cur.w)} strong</span>${strip(cur.w)}</div>`;
   if(!cur.k.length){$('next').textContent='Six picks done. Use next_pick.py from here.';$('kids').innerHTML='';return}
   const r=stack.length;
   $('next').textContent=`Round ${r+1}, pick #${picks[r]} – options, best first:`;
