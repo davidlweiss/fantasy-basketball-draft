@@ -1,4 +1,4 @@
-"""Draft decision tree for your first `plan_rounds` (6) picks -> results/tree.json
+"""Draft decision tree for your first `plan_rounds` (6) picks -> results/tree_<slug>.json (10team default; DRAFT_CONFIG=config_12team.json for 12 team)
 Anchors = the top `teams` players by ADP (never do_not_draft); anchor k is what you take at slot k in round 1.
 Every node gets up to BRANCH children for the next round, ranked 1..BRANCH:
   feasible = still plausibly on the board at that pick (window rule from draftlib, `reach` rule, top-`pool` players,
@@ -58,7 +58,7 @@ def leaves(n):
 if __name__ == "__main__":
     slots = [int(x) for x in sys.argv[1:] if x.isdigit()] or list(range(1, T + 1))
     with Pool(4) as p: out = p.map(run_slot, slots, chunksize=1)
-    path = os.path.join(ROOT, "results", "tree_quick.json" if QUICK else "tree.json")
+    path = os.path.join(ROOT, "results", "tree_quick.json" if QUICK else f"tree_{SLUG}.json")
     old = json.load(open(path)) if os.path.exists(path) else {}
     old.update({str(s): d for s, d in out})
     json.dump(old, open(path, "w"), separators=(",", ":"))

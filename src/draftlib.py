@@ -3,7 +3,9 @@ import json, os
 import numpy as np
 
 HERE = os.path.dirname(os.path.abspath(__file__)); ROOT = os.path.dirname(HERE)
-CFG = json.load(open(os.path.join(ROOT, "config.json")))
+# League profile: config.json (10 team) by default; DRAFT_CONFIG=config_12team.json python src/build_tree.py for 12 team
+CFG = json.load(open(os.path.join(ROOT, os.environ.get("DRAFT_CONFIG", "config.json"))))
+SLUG = CFG.get("slug", "10team")
 T, R, POOL, K, REACH = CFG["teams"], CFG["rounds"], CFG["pool"], CFG["first_rounds"], CFG["reach"]
 _d = json.load(open(os.path.join(ROOT, "data", "players.json")))["p"]
 

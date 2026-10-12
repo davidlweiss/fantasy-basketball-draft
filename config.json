@@ -1,4 +1,6 @@
 {
+  "name": "10 team",
+  "slug": "10team",
   "teams": 10,
   "rounds": 13,
   "pool": 130,
