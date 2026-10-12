@@ -1,0 +1,425 @@
+<title>Draft Board 2026-27</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@600;700&family=Barlow:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<style>
+/* Layout: sticky left board (filters + sortable table), right rail with roster bars and the add-a-player simulator. Stacks on phones. */
+:root{
+  --bg:#edf0f3; --surface:#ffffff; --surface2:#f5f7f9; --ink:#14202b; --muted:#5d6b78; --line:#d5dbe1;
+  --accent:#1f4fd8; --accent-ink:#ffffff; --pos:#0e8a6a; --neg:#d2452f; --mine:#dfe9ff; --taken:#e6e8eb;
+  --font-display:'Barlow Condensed','Arial Narrow',sans-serif; --font-body:'Barlow',system-ui,sans-serif; --font-data:'IBM Plex Mono',ui-monospace,monospace;
+}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){
+  --bg:#0f161d; --surface:#17212b; --surface2:#1d2935; --ink:#e6ecf1; --muted:#93a2b0; --line:#2b3a48;
+  --accent:#6f95ff; --accent-ink:#0b1220; --pos:#3fcf9f; --neg:#ff7a62; --mine:#1c2f57; --taken:#222d38; color-scheme:dark}}
+:root[data-theme="dark"]{
+  --bg:#0f161d; --surface:#17212b; --surface2:#1d2935; --ink:#e6ecf1; --muted:#93a2b0; --line:#2b3a48;
+  --accent:#6f95ff; --accent-ink:#0b1220; --pos:#3fcf9f; --neg:#ff7a62; --mine:#1c2f57; --taken:#222d38; color-scheme:dark}
+*{box-sizing:border-box}
+body{background:var(--bg);color:var(--ink);font:15px/1.4 var(--font-body);padding-inline:16px;padding-block:14px 40px}
+button,select,input{font:inherit;color:inherit}
+button{cursor:pointer}
+:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+h1,h2,h3{font-family:var(--font-display);margin:0;text-transform:uppercase;letter-spacing:.04em;text-wrap:balance}
+h1{font-size:30px;line-height:1}
+h2{font-size:19px}
+.num{font-family:var(--font-data);font-variant-numeric:tabular-nums}
+.top{display:flex;flex-wrap:wrap;align-items:baseline;gap:6px 18px;margin-bottom:12px}
+.top .sub{color:var(--muted);font-size:13px}
+.top .sp{flex:1}
+.btn{border:1px solid var(--line);background:var(--surface);border-radius:4px;padding:6px 10px;font-size:13px;font-weight:600}
+.btn:hover{border-color:var(--accent)}
+.btn.primary{background:var(--accent);color:var(--accent-ink);border-color:var(--accent)}
+.btn.warn{border-color:var(--neg);color:var(--neg)}
+.btn:disabled{opacity:.45;cursor:default}
+.wrap{display:grid;grid-template-columns:minmax(0,1fr) 450px;gap:16px;align-items:start}
+@media(max-width:980px){.wrap{grid-template-columns:minmax(0,1fr)}}
+.panel{background:var(--surface);border:1px solid var(--line);border-radius:6px}
+.filters{padding:10px 12px;display:flex;flex-direction:column;gap:10px;border-bottom:1px solid var(--line)}
+.row{display:flex;flex-wrap:wrap;gap:6px 8px;align-items:center}
+.chip{border:1px solid var(--line);background:var(--surface2);border-radius:999px;padding:3px 10px;font-size:13px;font-weight:500}
+.chip[aria-pressed="true"]{background:var(--accent);color:var(--accent-ink);border-color:var(--accent)}
+.chip small{font-family:var(--font-data);opacity:.75;margin-left:4px}
+.lbl{font-size:11px;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);font-weight:600}
+.field{border:1px solid var(--line);background:var(--surface2);border-radius:4px;padding:4px 8px;font-size:13px}
+input.field[type="number"]{width:64px}
+input.field[type="search"]{width:170px}
+label.chk{display:flex;gap:5px;align-items:center;font-size:13px}
+.scroll{overflow:auto;max-height:calc(100vh - 230px);min-height:320px}
+@media(max-width:980px){.scroll{max-height:70vh}}
+table{border-collapse:separate;border-spacing:0;width:100%;font-size:13px}
+th{position:sticky;top:0;background:var(--surface);z-index:2;text-align:right;font-family:var(--font-display);font-size:14px;letter-spacing:.05em;text-transform:uppercase;padding:6px 6px;border-bottom:1px solid var(--line);white-space:nowrap}
+th.l,td.l{text-align:left}
+th button{background:none;border:0;padding:0;font:inherit;text-transform:inherit;letter-spacing:inherit;color:var(--ink)}
+th button[aria-sort]::after{content:attr(data-arrow);margin-left:3px;color:var(--accent)}
+th.punt{opacity:.4;text-decoration:line-through}
+td{padding:4px 6px;border-bottom:1px solid var(--line);text-align:right;white-space:nowrap}
+tr.p{cursor:pointer}
+tr.p:hover td{background:var(--surface2)}
+tr.sel td{box-shadow:inset 0 2px 0 var(--accent),inset 0 -2px 0 var(--accent)}
+tr.mine td.nm{background:var(--mine)}
+tr.taken{opacity:.5}
+tr.taken td.nm .n{text-decoration:line-through}
+td.nm{text-align:left;position:sticky;left:0;background:var(--surface);z-index:1;min-width:150px}
+td.nm .n{font-weight:600}
+td.nm .s{display:block;color:var(--muted);font-size:11px;font-family:var(--font-data)}
+.z{font-family:var(--font-data);font-variant-numeric:tabular-nums;min-width:38px}
+.tgsel{width:62px;padding:2px 2px;font-size:12px;border:1px solid var(--line);background:var(--surface2);border-radius:3px}
+.tgsel.on{border-color:var(--accent);color:var(--accent);font-weight:600}
+.st{display:flex;gap:3px;justify-content:flex-end}
+.st button{border:1px solid var(--line);background:var(--surface2);border-radius:3px;padding:1px 6px;font-size:12px;font-weight:700}
+.st button[aria-pressed="true"]{background:var(--accent);color:var(--accent-ink);border-color:var(--accent)}
+.st button.t[aria-pressed="true"]{background:var(--muted);border-color:var(--muted)}
+.rail{display:flex;flex-direction:column;gap:14px;position:sticky;top:8px}
+@media(max-width:980px){.rail{position:static}}
+.sec{padding:12px 14px;display:flex;flex-direction:column;gap:10px}
+.sec header{display:flex;justify-content:space-between;align-items:baseline;gap:8px}
+.sec header .meta{color:var(--muted);font-size:12px}
+.sim-name{font-family:var(--font-display);font-size:24px;line-height:1.05;text-transform:uppercase;letter-spacing:.03em}
+.sim-line{font-family:var(--font-data);font-size:12px;color:var(--muted)}
+.tw{overflow-x:auto;max-width:100%}
+.rostbar{margin-bottom:16px}
+.rrow{display:flex;flex-wrap:wrap;gap:8px;align-items:center}
+.rpicks{display:flex;flex-wrap:wrap;gap:6px}
+.rp{display:inline-flex;align-items:center;gap:6px;border:1px solid var(--accent);background:var(--mine);border-radius:999px;padding:3px 6px 3px 12px;font-weight:600;font-size:14px}
+.rp button{border:0;background:none;color:var(--muted);padding:0 4px;font-size:13px}
+.tiles{display:grid;grid-template-columns:repeat(9,minmax(0,1fr));gap:8px}
+@media(max-width:900px){.tiles{grid-template-columns:repeat(5,minmax(0,1fr))}}
+@media(max-width:520px){.tiles{grid-template-columns:repeat(3,minmax(0,1fr))}}
+.tile{border:1px solid var(--line);border-radius:6px;padding:8px 8px 6px;background:var(--surface2);display:flex;flex-direction:column;gap:2px;min-width:0}
+.tile.need{border-color:var(--neg);box-shadow:inset 0 0 0 1px var(--neg)}
+.tile.ok{opacity:.8}
+.tile.off{opacity:.45}
+.th2{display:flex;justify-content:space-between;align-items:center;gap:4px}
+.tc{font-family:var(--font-display);font-size:18px;letter-spacing:.05em}
+.pbtn{border:0;background:none;color:var(--muted);font-size:11px;text-decoration:underline;padding:0;cursor:pointer}
+.pbtn[aria-pressed="true"]{color:var(--accent)}
+.tz{font-family:var(--font-display);font-size:36px;line-height:1;font-weight:700}
+.tz.pos,.tg2 b.pos{color:var(--pos)}.tz.neg,.tg2 b.neg{color:var(--neg)}.tz.zero,.tg2 b.zero{color:var(--muted)}
+.tg2{display:flex;justify-content:space-between;align-items:baseline;font-size:12px;color:var(--muted)}
+.tg2 b{font-family:var(--font-display);font-size:20px}
+.tw2{font-family:var(--font-data);font-size:11px;color:var(--muted)}
+.tile.need .tw2{color:var(--neg);font-weight:600}
+th .wt{font-family:var(--font-data);font-size:10px;font-weight:400;color:var(--muted);letter-spacing:0;text-transform:none;margin-top:1px}
+.fitbox{border-top:1px solid var(--line);padding-top:12px;display:flex;flex-direction:column;gap:8px}
+.fitbox .fh{display:flex;justify-content:space-between;align-items:baseline}
+.fitbox h3{font-size:17px}
+.fitbox .fs{font-family:var(--font-display);font-size:34px;line-height:1;font-weight:700}
+.fs.pos,.pts.pos{color:var(--pos)}.fs.neg,.pts.neg{color:var(--neg)}.fs.zero,.pts.zero{color:var(--muted)}
+table.fit{width:100%;border-collapse:collapse;font-size:13px}
+table.fit th{position:static;font-size:12px;text-align:right;padding:3px 6px}table.fit th.l{text-align:left}
+table.fit td{text-align:right;padding:4px 6px;border-bottom:1px solid var(--line)}
+table.fit td.c{text-align:left;font-family:var(--font-display);font-size:16px;letter-spacing:.05em}
+table.fit td.c.punt{text-decoration:line-through;opacity:.45}
+table.fit td.pts{font-weight:600}
+table.fit tr.tot td{border-top:2px solid var(--ink);font-weight:600}
+table.bigt td.big{font-family:var(--font-display);font-size:28px;line-height:1;font-weight:600;text-align:right;padding:8px 6px;letter-spacing:.01em}
+table.bigt td.big.pos{color:var(--pos)}table.bigt td.big.neg{color:var(--neg)}table.bigt td.big.avg{color:var(--ink)}
+table.bigt td.big .was{font-family:var(--font-data);font-size:10px;font-weight:400;margin-top:3px}
+table.bigt td.big.zero{color:var(--muted)}
+table.bigt td.c{font-size:20px;padding:8px 6px}
+table.bigt th{font-size:13px;text-align:right}table.bigt th.l{text-align:left}
+table.bigt tr.tot td{border-top:2px solid var(--ink)}
+table.bigt .sgn{font-size:.55em}
+.was{display:block;font-size:10px;color:var(--muted)}
+.wasi{color:var(--muted)}
+.sim{width:100%;font-size:12.5px}
+.sim th{position:static;font-size:12px;border-bottom:1px solid var(--line);padding:3px 4px}
+.sim td{padding:5px 4px}
+.sim td.c{font-family:var(--font-display);font-size:15px;letter-spacing:.05em;text-align:left}
+.sim td.c.punt{text-decoration:line-through;opacity:.45}
+.d.zero{color:var(--muted)}
+.d.pos{color:var(--pos);font-weight:600}.d.neg{color:var(--neg);font-weight:600}
+.bar{position:relative;height:10px;background:var(--surface2);border-radius:2px;min-width:90px}
+.bar{background-image:repeating-linear-gradient(to right,var(--line) 0 1px,transparent 1px calc(100%/12))}
+.bar::before{content:"";position:absolute;left:50%;top:-2px;bottom:-2px;width:1px;background:var(--line)}
+.bar i{position:absolute;top:0;bottom:0;border-radius:2px}
+.bar u.par{position:absolute;top:-3px;bottom:-3px;width:2px;margin-left:-1px;background:var(--accent);text-decoration:none;z-index:1}
+.bar i.b{top:3px;bottom:3px;opacity:.35}
+.pos-bg{background:var(--pos)}.neg-bg{background:var(--neg)}
+.punts{display:flex;flex-wrap:wrap;gap:5px}
+.picks{display:flex;flex-direction:column;gap:2px;font-size:13px}
+.picks div{display:flex;justify-content:space-between;gap:8px;padding:3px 0;border-bottom:1px dashed var(--line)}
+.picks button{background:none;border:0;color:var(--muted);padding:0 4px}
+.empty{color:var(--muted);font-size:13px}
+.recs{display:flex;flex-direction:column}
+.recs button{display:flex;justify-content:space-between;gap:8px;text-align:left;background:none;border:0;border-bottom:1px solid var(--line);padding:6px 2px;font-size:13px}
+.recs button:hover{background:var(--surface2)}
+.recs .why{color:var(--muted);font-size:11px;font-family:var(--font-data)}
+.note{font-size:12px;color:var(--muted)}
+.sgn{font-size:.65em;opacity:.7;vertical-align:.12em;margin-right:1px}
+.bz{min-width:130px}
+.axis{position:relative;height:12px;margin:3px 0 0}
+.axis span{position:absolute;transform:translateX(-50%);font-family:var(--font-data);font-size:9px;color:var(--muted);letter-spacing:0}
+.axis span.z0{color:var(--ink);font-weight:600}
+.sim th.axh{padding-bottom:2px}
+.zl{font-size:11px;color:var(--muted);margin-bottom:2px;white-space:nowrap}
+.zl b.pos{color:var(--pos)}.zl b.neg{color:var(--neg)}
+.sim td{vertical-align:middle}
+</style>
+
+<div class="top">
+  <h1>Draft Board</h1>
+  <span class="sub">2026-27 · 9-cat · projections from your sheet</span>
+  <span class="sp"></span>
+  <label class="chk" title="Averages and spreads for z-scores come from this many top-ranked players"><span class="lbl">Z-score pool</span><input class="field" id="pool" type="number" min="20" max="200" step="1" aria-label="Z-score pool size: top N players by projected rank"><span class="note">top players</span></label>
+  <label class="chk" title="Used to estimate par: what an average team holds after the same number of picks"><span class="lbl">Teams</span><input class="field" id="teams" type="number" min="2" max="30" step="1" aria-label="Number of teams in the league"></label>
+  <button class="btn" id="theme" type="button">Theme</button>
+  <button class="btn warn" id="reset" type="button">Reset draft</button>
+</div>
+
+<section class="panel sec rostbar" id="rosterbox" aria-label="My roster"></section>
+
+<div class="wrap">
+  <section class="panel" aria-label="Player board">
+    <div class="filters">
+      <div class="row" id="rounds"></div>
+      <div class="row">
+        <input class="field" id="q" type="search" placeholder="Search player" aria-label="Search player">
+        <span class="lbl">ADP</span>
+        <input class="field" id="amin" type="number" placeholder="min" aria-label="ADP min">
+        <input class="field" id="amax" type="number" placeholder="max" aria-label="ADP max">
+        <label class="chk"><input type="checkbox" id="tonly"> Targets only</label>
+        <label class="chk"><input type="checkbox" id="stk"> Show taken</label>
+        <label class="chk"><input type="checkbox" id="sdnd"> Show do-not-draft</label>
+      </div>
+      <div class="row"><span class="lbl">Rank by</span>
+        <button class="chip" id="m-fit" type="button" aria-pressed="true" title="Value weighted toward the categories your roster is weakest in">Fit to my team</button>
+        <button class="chip" id="m-val" type="button" aria-pressed="false" title="Plain sum of category z-scores">Raw value</button>
+        <span class="note" id="count"></span>
+      </div>
+    </div>
+    <div class="scroll"><table id="board"></table></div>
+  </section>
+
+  <aside class="rail">
+    <section class="panel sec" id="simbox"></section>
+    <section class="panel sec" id="recbox"></section>
+  </aside>
+</div>
+
+<script>
+const DATA=__DATA__;
+const CATS=['FG%','FT%','3PM','PTS','REB','AST','STL','BLK','TO'];
+const ROUNDS=['1-2','3-4','5-6','7-8','9-10','11-12','13-14'];
+const KEY='fntsy2627.v1';
+const ZMAX=3;
+const axis=()=>`<div class="axis">${Array.from({length:2*ZMAX+1},(_,i)=>{const v=i-ZMAX;return `<span style="left:${i/(2*ZMAX)*100}%"${v===0?' class="z0"':''}>${v}</span>`}).join('')}</div>`;
+
+/* ---- players + z-scores: means and spreads come from the top POOL players by projected rank ---- */
+const P=DATA.p.map(r=>({n:r[0],rk:r[1],ly:r[2],adp:r[3],dnd:!!r[4],fgm:r[5],fga:r[6],ftm:r[7],fta:r[8],
+  c:[r[9],r[10],r[11],r[12],r[13],r[14],r[15]]}));
+const N=P.length;
+const mean=a=>a.reduce((x,y)=>x+y,0)/a.length;
+const sd=a=>{const m=mean(a);return Math.sqrt(a.reduce((x,y)=>x+(y-m)**2,0)/a.length)};
+let POOL=130;
+let TEAMS=10;
+function computeZ(n){
+  const pool=[...P].sort((a,b)=>a.rk-b.rk).slice(0,n);
+  const fgR=pool.reduce((a,p)=>a+p.fgm,0)/pool.reduce((a,p)=>a+p.fga,0);
+  const ftR=pool.reduce((a,p)=>a+p.ftm,0)/pool.reduce((a,p)=>a+p.fta,0);
+  const fgSd=sd(pool.map(p=>p.fgm-fgR*p.fga)), ftSd=sd(pool.map(p=>p.ftm-ftR*p.fta));
+  const cm=[],cs=[];
+  for(let k=0;k<7;k++){const a=pool.map(p=>p.c[k]);cm.push(mean(a));cs.push(sd(a))}
+  P.forEach(p=>{
+    p.z=[(p.fgm-fgR*p.fga)/fgSd,(p.ftm-ftR*p.fta)/ftSd];
+    for(let k=0;k<7;k++){let z=(p.c[k]-cm[k])/cs[k]; if(k===6) z=-z; p.z.push(z)}
+  });
+}
+computeZ(POOL);
+const byAdp=[...P].sort((a,b)=>(a.adp??999)-(b.adp??999));
+/* par: the average z of the players an average team holds after n picks (top TEAMS*n by ADP) */
+function parZ(n){const k=Math.min(N,Math.max(1,n)*TEAMS);const top=byAdp.slice(0,k);return CATS.map((_,i)=>mean(top.map(p=>p.z[i])))}
+const byName=Object.fromEntries(P.map(p=>[p.n,p]));
+
+/* ---- state ---- */
+let S={st:{},tg:{...DATA.t},punt:{},sel:null,round:'all',tonly:false,stk:false,sdnd:false,q:'',amin:'',amax:'',mode:'fit',sort:'adp',dir:1,confirm:false};
+try{const s=JSON.parse(localStorage.getItem(KEY)||'null');if(s){S.st=s.st||{};S.tg=s.tg||S.tg;S.punt=s.punt||{};if(s.pool>=20&&s.pool<=N){POOL=s.pool;computeZ(POOL)}if(s.teams>=2&&s.teams<=30)TEAMS=s.teams}}catch(e){}
+const save=()=>{try{localStorage.setItem(KEY,JSON.stringify({st:S.st,tg:S.tg,punt:S.punt,pool:POOL,teams:TEAMS}))}catch(e){}};
+
+/* ---- team math ---- */
+function team(list){
+  const t={fgm:0,fga:0,ftm:0,fta:0,c:[0,0,0,0,0,0,0],z:new Array(9).fill(0),n:list.length};
+  list.forEach(p=>{t.fgm+=p.fgm;t.fga+=p.fga;t.ftm+=p.ftm;t.fta+=p.fta;p.c.forEach((v,i)=>t.c[i]+=v);p.z.forEach((v,i)=>t.z[i]+=v)});
+  t.raw=[t.fga?t.fgm/t.fga:0,t.fta?t.ftm/t.fta:0,...t.c.map(v=>t.n?v/t.n:0)];
+  t.za=t.z.map(v=>t.n?v/t.n:0);
+  return t;
+}
+const dcls=v=>{const r=rnd(v,1);return r>0?'pos':r<0?'neg':'zero'};
+const mine=()=>P.filter(p=>S.st[p.n]==='m');
+const active=i=>!S.punt[i];
+function weights(t){
+  return CATS.map((_,i)=>{
+    if(!active(i)) return 0;
+    if(!t.n||S.mode!=='fit') return 1;
+    const avg=t.za[i]-parZ(t.n)[i];
+    return Math.min(1.8,Math.max(.4,1-.5*avg));
+  });
+}
+function score(p,w){return p.z.reduce((a,z,i)=>a+z*w[i],0)}
+
+/* ---- formatting ---- */
+const rnd=(v,d)=>{const f=10**d;return Math.sign(v)*Math.round((Math.abs(v)+1e-9)*f)/f};
+const sg=(v,d=1)=>{const r=rnd(v,d);return r===0?(0).toFixed(d):(r>0?'<small class="sgn">+</small>':'−')+Math.abs(r).toFixed(d)};
+const fmtRaw=(i,v)=>i<2?rnd(v,3).toFixed(3).replace(/^0/,''):rnd(v,1).toFixed(1);
+const esc=s=>String(s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+function heat(z,i){
+  if(!active(i)) return '';
+  const a=Math.min(1,Math.abs(z)/3)*60;
+  return `background:color-mix(in srgb, var(${z>=0?'--pos':'--neg'}) ${a.toFixed(0)}%, transparent)`;
+}
+
+/* ---- filtering ---- */
+function visible(){
+  const t=team(mine()), w=weights(t);
+  const q=S.q.trim().toLowerCase(), amin=parseFloat(S.amin), amax=parseFloat(S.amax);
+  let rows=P.filter(p=>{
+    const st=S.st[p.n];
+    if(st==='t'&&!S.stk) return false;
+    if(st==='m'&&S.round!=='all'&&false) return false;
+    if(p.dnd&&!S.sdnd&&st!=='m') return false;
+    if(q&&!p.n.toLowerCase().includes(q)) return false;
+    if(!isNaN(amin)&&(p.adp==null||p.adp<amin)) return false;
+    if(!isNaN(amax)&&(p.adp==null||p.adp>amax)) return false;
+    if(S.tonly&&!S.tg[p.n]) return false;
+    if(S.round==='none'&&S.tg[p.n]) return false;
+    if(S.round!=='all'&&S.round!=='none'&&S.tg[p.n]!==S.round) return false;
+    return true;
+  });
+  const key={adp:p=>p.adp??999,name:p=>p.n,fit:p=>-score(p,w),tg:p=>S.tg[p.n]?parseInt(S.tg[p.n]):99};
+  const val={fit:p=>-score(p,w)};
+  CATS.forEach((c,i)=>key['z'+i]=p=>-p.z[i]);
+  const f=key[S.sort]||key.adp;
+  rows.sort((a,b)=>{const x=f(a),y=f(b);return (x<y?-1:x>y?1:0)*S.dir});
+  return {rows,w,t};
+}
+
+/* ---- render ---- */
+function renderRounds(){
+  const left=r=>P.filter(p=>S.tg[p.n]===r&&!S.st[p.n]).length;
+  const chips=[['all','All'],...ROUNDS.map(r=>[r,'R'+r]),['none','Untagged']];
+  document.getElementById('rounds').innerHTML='<span class="lbl">Round</span>'+chips.map(([k,l])=>
+    `<button type="button" class="chip" data-round="${k}" aria-pressed="${S.round===k}">${l}${ROUNDS.includes(k)?`<small>${left(k)}</small>`:''}</button>`).join('');
+}
+function renderBoard(){
+  const {rows,w,t}=visible();
+  const arrow=k=>S.sort===k?(S.dir>0?' ▲':' ▼'):'';
+  const th=(k,l,cls='',i,sub)=>`<th class="${cls}${i!=null&&!active(i)?' punt':''}"><button type="button" data-sort="${k}">${l}${arrow(k)}</button>${sub!=null?`<div class="wt">${sub}</div>`:''}</th>`;
+  let h='<thead><tr>'+th('name','Player','l')+th('adp','ADP')+th('tg','Target')+th('fit',S.mode==='fit'?'Fit':'Value','',null,'Σ z × wt')+CATS.map((c,i)=>th('z'+i,c,'',i,w[i]===0?'punt':'×'+rnd(w[i],1).toFixed(1))).join('')+'<th>Status</th></tr></thead><tbody>';
+  h+=rows.map(p=>{
+    const st=S.st[p.n]||'';
+    const sc=score(p,w);
+    const opts='<option value="">–</option>'+ROUNDS.map(r=>`<option value="${r}"${S.tg[p.n]===r?' selected':''}>R${r}</option>`).join('');
+    return `<tr class="p${st==='m'?' mine':''}${st==='t'?' taken':''}${S.sel===p.n?' sel':''}" data-n="${esc(p.n)}">
+      <td class="nm"><span class="n">${esc(p.n)}</span><span class="s">#${p.rk}${p.ly!=null?' · LY '+p.ly:''}${p.dnd?' · DND':''}</span></td>
+      <td class="num">${p.adp!=null?rnd(p.adp,1).toFixed(1):'–'}</td>
+      <td><select class="tgsel${S.tg[p.n]?' on':''}" data-tg="${esc(p.n)}" aria-label="Target round for ${esc(p.n)}">${opts}</select></td>
+      <td class="z" style="font-weight:600">${sg(sc)}</td>
+      ${p.z.map((z,i)=>`<td class="z" style="${heat(z,i)}">${sg(z)}</td>`).join('')}
+      <td><div class="st"><button type="button" class="m" data-st="m" data-n="${esc(p.n)}" aria-pressed="${st==='m'}" title="Mine">Mine</button><button type="button" class="t" data-st="t" data-n="${esc(p.n)}" aria-pressed="${st==='t'}" title="Taken by someone else">Gone</button></div></td></tr>`;
+  }).join('')+'</tbody>';
+  document.getElementById('board').innerHTML=h;
+  document.getElementById('count').textContent=rows.length+' shown';
+  document.getElementById('m-fit').setAttribute('aria-pressed',S.mode==='fit');
+  document.getElementById('m-val').setAttribute('aria-pressed',S.mode!=='fit');
+}
+function renderSim(){
+  const el=document.getElementById('simbox');
+  const p=S.sel&&byName[S.sel];
+  const cur=mine();
+  if(!p){el.innerHTML='<header><h2>Add-a-player simulator</h2></header><p class="empty">Select any player on the board to see how your roster changes if you draft them.</p>';return}
+  const isMine=S.st[p.n]==='m';
+  const base=isMine?cur.filter(x=>x!==p):cur;
+  const tb=team(base), ta=team(isMine?cur:[...cur,p]);
+  const parA=parZ(ta.n);
+  const wB=weights(tb), parB=tb.n?parZ(tb.n):null;
+  const fitRows=CATS.map((c,i)=>{
+    const gapB=tb.n?tb.za[i]-parB[i]:null, pts=p.z[i]*wB[i];
+    return `<tr><td class="c${active(i)?'':' punt'}">${c}</td><td class="num">${gapB==null?'–':sg(gapB)}</td><td class="num">${wB[i]===0?'punt':'×'+rnd(wB[i],1).toFixed(1)}</td><td class="num">${sg(p.z[i])}</td><td class="num pts ${dcls(pts)}">${sg(pts)}</td></tr>`}).join('');
+  const fitTotal=score(p,wB);
+  const fitNote=(S.mode==='fit'&&tb.n)?'Weight = 1 − 0.5 × your gap vs par, kept between 0.4 and 1.8. Where you trail par the category counts more, where you lead it counts less.':'Every weight is 1 (raw value mode or an empty roster), so Fit is just the sum of his z-scores.';
+  const cell=v=>`<td class="big ${dcls(v)}">${sg(v)}</td>`;
+  const rows=CATS.map((c,i)=>{
+    const dz=ta.za[i]-tb.za[i], gap=ta.za[i]-parA[i];
+    return `<tr><td class="c${active(i)?'':' punt'}">${c}</td><td class="big avg">${fmtRaw(i,ta.raw[i])}<span class="was">was ${tb.n?fmtRaw(i,tb.raw[i]):'–'}</span></td>${cell(ta.za[i])}${cell(dz)}${cell(gap)}</tr>`}).join('');
+  const nAct=CATS.filter((_,i)=>active(i)).length||1;
+  const avgAct=(arr,par)=>arr.reduce((a,z,i)=>a+(active(i)?z-(par?par[i]:0):0),0)/nAct;
+  const oA=avgAct(ta.za), oB=tb.n?avgAct(tb.za):0, oG=avgAct(ta.za,parA);
+  el.innerHTML=`<header><h2>Add-a-player simulator</h2><span class="meta">${isMine?'on your roster':'if drafted'}</span></header>
+    <div><div class="sim-name">${esc(p.n)}</div>
+    <div class="sim-line">#${p.rk} · ADP ${p.adp!=null?rnd(p.adp,1).toFixed(1):'–'} · ${(p.fgm).toFixed(1)}/${p.fga.toFixed(1)} FG · ${p.ftm.toFixed(1)}/${p.fta.toFixed(1)} FT · ${p.c[0]} 3 · ${p.c[1]} pts · ${p.c[2]} reb · ${p.c[3]} ast · ${p.c[4]} stl · ${p.c[5]} blk · ${p.c[6]} to</div></div>
+    <div class="row">
+      <button class="btn primary" type="button" data-st="m" data-n="${esc(p.n)}">${isMine?'Remove from my team':'Draft to my team'}</button>
+      <button class="btn" type="button" data-st="t" data-n="${esc(p.n)}">${S.st[p.n]==='t'?'Put back':'Taken by others'}</button>
+    </div>
+    <table class="sim bigt"><thead><tr><th class="l">Cat</th><th>Avg</th><th>Team z</th><th>Change</th><th>vs par</th></tr></thead><tbody>${rows}
+      <tr class="tot"><td class="c">All</td><td></td>${cell(oA)}${cell(oA-oB)}${cell(oG)}</tr></tbody></table>
+    <div class="fitbox"><div class="fh"><h3>${S.mode==='fit'?'Fit':'Value'} score</h3><span class="fs ${dcls(fitTotal)}">${sg(fitTotal)}</span></div>
+    <table class="fit"><thead><tr><th class="l">Cat</th><th>Your gap</th><th>Weight</th><th>His z</th><th>Points</th></tr></thead><tbody>${fitRows}<tr class="tot"><td class="c">Total</td><td></td><td></td><td></td><td class="num pts ${dcls(fitTotal)}">${sg(fitTotal)}</td></tr></tbody></table>
+    <div class="note">Points = his z × weight. ${fitNote} Gaps use your roster before adding him.</div></div>
+    <div class="note">Avg: per-player average for your roster, with the old value under it. Team z: your roster's average z after adding him, against the top ${POOL} players. Change: what he does to it. vs par: your team z minus an average ${TEAMS}-team roster after ${ta.n} picks. "All" averages your active categories.</div>`;
+}
+function renderRoster(){
+  const cur=mine(), t=team(cur), par=parZ(t.n), w=weights(t);
+  const el=document.getElementById('rosterbox');
+  const tiles=CATS.map((c,i)=>{
+    const gap=t.n?t.za[i]-par[i]:0, off=!active(i);
+    const need=!off&&t.n&&w[i]>=1.2, ok=!off&&t.n&&w[i]<=0.8;
+    return `<div class="tile${need?' need':''}${ok?' ok':''}${off?' off':''}">
+      <div class="th2"><span class="tc">${c}</span><button type="button" class="pbtn" data-punt="${i}" aria-pressed="${off}" title="Punt this category: ignore it when ranking players">${off?'punted':'punt'}</button></div>
+      <div class="tz ${dcls(t.n?t.za[i]:0)}">${t.n?sg(t.za[i]):'–'}</div>
+      <div class="tg2"><span>vs par</span><b class="${dcls(gap)}">${t.n?sg(gap):'–'}</b></div>
+      <div class="tw2">${off?'ignored':t.n?`${need?'NEED ':ok?'covered ':''}×${rnd(w[i],1).toFixed(1)}`:'×1.0'}</div></div>`}).join('');
+  el.innerHTML=`<header><h2>My roster</h2><span class="meta">${cur.length} drafted · par is an average team after ${Math.max(cur.length,1)} picks</span></header>
+    <div class="rrow">
+      <div class="rpicks">${cur.length?cur.map(p=>`<span class="rp">${esc(p.n)}<button type="button" data-st="m" data-n="${esc(p.n)}" aria-label="Remove ${esc(p.n)}">✕</button></span>`).join(''):'<span class="empty">No picks yet. Press Mine on a player.</span>'}</div>
+    </div>
+    <div class="tiles">${tiles}</div>
+    <div class="note">Team z is your roster's average z. The ×weight is what each category is worth when ranking players: higher means you need it more. The board's Fit column uses these weights.</div>`;
+}
+function renderRecs(){
+  const el=document.getElementById('recbox');
+  const {rows,w,t}=visible();
+  const top=rows.filter(p=>!S.st[p.n]).map(p=>({p,s:score(p,w)})).sort((a,b)=>b.s-a.s).slice(0,6);
+  const label=S.round==='all'?'all available':S.round==='none'?'untagged':'R'+S.round+' targets';
+  el.innerHTML=`<header><h2>Best fits now</h2><span class="meta">${label}</span></header>
+    <div class="recs">${top.length?top.map(({p,s})=>{
+      const best=p.z.map((z,i)=>[z,i]).filter(x=>active(x[1])).sort((a,b)=>b[0]-a[0]).slice(0,2).map(x=>CATS[x[1]]).join(' · ');
+      return `<button type="button" data-pick="${esc(p.n)}"><span><b>${esc(p.n)}</b><br><span class="why">${best}${S.tg[p.n]?' · R'+S.tg[p.n]:''}</span></span><span class="num">${sg(s)}</span></button>`}).join(''):'<p class="empty">Nothing available with these filters.</p>'}</div>
+    <div class="note">Ranks the players in the current filter. ${S.mode==='fit'?'Fit weights the categories where you trail par up and where you lead par down.':'Raw value sums every active category equally.'}</div>`;
+}
+function render(){renderRounds();renderBoard();renderSim();renderRoster();renderRecs()}
+
+/* ---- events ---- */
+const $=id=>document.getElementById(id);
+function setStatus(n,s){S.st[n]=S.st[n]===s?undefined:s;if(!S.st[n])delete S.st[n];save()}
+document.addEventListener('click',e=>{
+  const t=e.target;
+  const r=t.closest('[data-round]');if(r){S.round=r.dataset.round;render();return}
+  const so=t.closest('[data-sort]');if(so){const k=so.dataset.sort;if(S.sort===k)S.dir*=-1;else{S.sort=k;S.dir=1}render();return}
+  const st=t.closest('[data-st]');if(st){setStatus(st.dataset.n,st.dataset.st);S.sel=st.dataset.n;render();e.stopPropagation();return}
+  const pu=t.closest('[data-punt]');if(pu){const i=pu.dataset.punt;S.punt[i]=!S.punt[i];save();render();return}
+  const pk=t.closest('[data-pick]');if(pk){S.sel=pk.dataset.pick;render();return}
+  if(t.closest('select'))return;
+  const row=t.closest('tr.p');if(row){S.sel=row.dataset.n;render()}
+});
+document.addEventListener('change',e=>{
+  const t=e.target;
+  if(t.dataset.tg!==undefined){if(t.value)S.tg[t.dataset.tg]=t.value;else delete S.tg[t.dataset.tg];save();render()}
+});
+[['q','q'],['amin','amin'],['amax','amax']].forEach(([id,k])=>$(id).addEventListener('input',e=>{S[k]=e.target.value;renderBoard();renderRecs();$('count')})) ;
+[['tonly','tonly'],['stk','stk'],['sdnd','sdnd']].forEach(([id,k])=>$(id).addEventListener('change',e=>{S[k]=e.target.checked;render()}));
+$('pool').value=POOL;
+$('pool').addEventListener('change',e=>{const v=parseInt(e.target.value);if(v>=20&&v<=N){POOL=v;computeZ(v);save();render()}else e.target.value=POOL});
+$('teams').value=TEAMS;
+$('teams').addEventListener('change',e=>{const v=parseInt(e.target.value);if(v>=2&&v<=30){TEAMS=v;save();render()}else e.target.value=TEAMS});
+$('m-fit').onclick=()=>{S.mode='fit';render()};
+$('m-val').onclick=()=>{S.mode='val';render()};
+$('reset').onclick=()=>{
+  if(!S.confirm){S.confirm=true;$('reset').textContent='Click again to clear picks';setTimeout(()=>{S.confirm=false;$('reset').textContent='Reset draft'},3500);return}
+  S.st={};S.sel=null;S.confirm=false;$('reset').textContent='Reset draft';save();render();
+};
+$('theme').onclick=()=>{const r=document.documentElement;const d=r.dataset.theme==='dark'||(!r.dataset.theme&&matchMedia('(prefers-color-scheme: dark)').matches);r.dataset.theme=d?'light':'dark'};
+S.sel=P[0].n;
+render();
+</script>

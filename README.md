@@ -1,0 +1,28 @@
+# Fantasy basketball draft toolkit 2026-27 (Yahoo 9-cat, 10 teams, 13 rounds, snake)
+
+Everything is rebuilt from `data/fntsy_2026-2027.xlsx` + `config.json`. Needs Python 3 with `numpy` and `openpyxl`.
+
+## Run order
+| Step | Command | Output |
+|---|---|---|
+| 1. Read the spreadsheet | `python src/extract_data.py` | `data/players.json` |
+| 2. Category scarcity by round | `python src/analysis_scarcity.py` | `results/scarcity.json` |
+| 3. Strategy per slot + round plans | `python src/build_plans.py` (~30 min; `--quick` to test) | `results/plans.json` |
+| 4. Best first-four combos | `python src/build_foursomes.py` (all slots ~1 hr) or `... 8 9` | `results/foursomes.json` |
+| 5. Build the pages | `python src/build_pages.py` | `dist/draft-board.html`, `dist/draft-plans.html` |
+| Live during the draft | `python src/next_pick.py --roster "A,B" --pick 24 --gone "C,D"` | ranked Fit list |
+
+Results already in `results/` were produced by these scripts; `dist/` is the built pages (open in any browser).
+
+## Settings (`config.json`)
+- `teams`, `rounds`, `pool` (z-scores use the top-N players by projected rank), `reach` (max picks past ADP you'll take a player).
+- `first_four_exclude`: names you will NOT draft in the first 4 rounds (exact names from `data/players.json`). Used by `build_foursomes.py`; re-run it, then `build_pages.py`.
+- The sheet's own "Do not draft" column is always excluded everywhere.
+
+## Method in one paragraph
+z = (stat - mean) / sd over the top-130 by projected rank (FG%/FT% as makes above an average shooter on the same attempts; TO flipped). Team z = average of your players' z. Par(n) = average z of the top 10n players by ADP (what an average team holds after n picks). Fit = sum over categories of player z x weight, weight = clip(1 - 0.5 x (your avg z - par), 0.4, 1.8): categories where you're behind par count more. Skip players whose ADP is > `reach` picks after your pick.
+First four: enumerate every reachable 4-player set assuming others take best ADP, shortlist, simulate the remaining 9 rounds (opponents pick ADP + noise; you follow Fit) and score expected categories won out of 9. Absolute numbers are inflated; compare only. Gaps under ~0.1 are ties.
+
+## Files
+- `src/draftlib.py` model + simulator; `web/*_template.html` page sources; `data/`, `results/`, `dist/` as above.
+- Note: published board data now labels the five R1-2 targets (Jokic, Tatum, Edwards, Mitchell, Haliburton) as "1-2" (previously "null").

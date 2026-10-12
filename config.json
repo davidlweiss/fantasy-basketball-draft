@@ -1,0 +1,17 @@
+{
+  "teams": 10,
+  "rounds": 13,
+  "pool": 130,
+  "first_rounds": 4,
+  "reach": 10,
+  "xlsx": "data/fntsy_2026-2027.xlsx",
+  "first_four_exclude": [],
+  "_notes": {
+    "teams": "League size. Used for par and for the snake draft order.",
+    "rounds": "Roster spots per team (13 x 10 teams = 130 drafted players).",
+    "pool": "z-scores use the mean and spread of the top N players by projected rank.",
+    "first_rounds": "How many early picks count as 'the first four'.",
+    "reach": "Max picks past a player's ADP you may take him (first four and later picks).",
+    "first_four_exclude": "Names that may NOT be picked in the first picks (still allowed later). Must match names in data/players.json exactly."
+  }
+}
