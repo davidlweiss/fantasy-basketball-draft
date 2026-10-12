@@ -12,17 +12,19 @@ ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 CFG = json.load(open(os.path.join(ROOT, "config.json")))
 wv = openpyxl.load_workbook(os.path.join(ROOT, CFG["xlsx"]), data_only=True)
 
-def made_att(text):                      # '0.579(10.9/18.9)' -> (10.9, 18.9)
-    m = re.match(r"([\d.]+)\(([\d.]+)/([\d.]+)\)", str(text))
-    return (float(m[2]), float(m[3])) if m else (None, None)
-
 num = lambda v: v if isinstance(v, (int, float)) else None
+ws = wv["2026-2027 projections"]
+hdr = {}                                   # first occurrence of each header -> column index
+for i, c in enumerate(next(ws.iter_rows(min_row=1, max_row=1, values_only=True))):
+    if c and c not in hdr: hdr[c] = i
+# Makes/attempts come from the numeric FGM/FGA/FTM/FTA columns (the 'FG%' / 'FT%' text columns such as
+# '0.579(10.9/18.9)' do not reconcile with PTS for most players, so they are not used).
 players = []
-for r in wv["2026-2027 projections"].iter_rows(min_row=2, values_only=True):
+for r in ws.iter_rows(min_row=2, values_only=True):
     if not r[1] or r[2] is None:
         continue
-    fgm, fga = made_att(r[7]); ftm, fta = made_att(r[8])
-    if fgm is None:
+    fgm, fga, ftm, fta = (num(r[hdr[k]]) for k in ("FGM", "FGA", "FTM", "FTA"))
+    if None in (fgm, fga, ftm, fta):
         continue
     players.append([r[1], r[2], num(r[3]), num(r[4]), int(bool(r[6])), fgm, fga, ftm, fta,
                     r[9], r[10], r[11], r[12], r[13], r[14], r[15]])
