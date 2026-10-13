@@ -40,3 +40,8 @@ First four: enumerate every reachable 4-player set assuming others take best ADP
 - `play(..., season=make_season_world(seed, sig))` simulates season totals with per-team "volume" multipliers (games played / active roster / streaming) and noisy weekly category results. Parameters (`SEASON` in `draftlib.py`) are fitted by `python src/calibrate_season.py` to the 10-team standings (spreads and correlations match; draft-survival `gamma=0.5` is an assumption the data cannot pin down).
 - Default `play()` behaviour (no `season=`) is unchanged, so older results still reproduce.
 - `make_season_world(seed, sig, fixed=True)`: rosters stay as drafted all season (no volume factor, no waiver fade); totals = per-game x projected games; only weekly matchup noise remains (fixed absolute size = real spread x fitted k). This is the mode to use for draft strategy.
+
+## Live draft tab (10 team page)
+- `python src/build_live.py` -> `results/live_<slug>.json` (season-z values, par, ADP, games, sheet targets); `build_pages.py` embeds it as the "Live draft" tab of `dist/draft-tree-<slug>.html`.
+- Mark players Gone / Mine as the draft goes (type a name + Enter = gone, Shift+Enter = yours). It re-ranks from your actual roster: balanced fit on games-played-aware season z-scores, players within `reach` of your next pick, plus your sheet targets still on the board. State is kept in the browser (localStorage).
+- Tree and Top-combos tabs are rebuilt on the same fixed-roster, games-played-aware model (`play_prefix(season=...)`).

@@ -27,21 +27,21 @@ def run_slot(s):
         if key in seen: continue
         seen.add(key); cands.append(tuple(IDX[n] for n in path))
         if len(cands) == CAND: break
-    noises = [np.random.default_rng(777000 + 10000 * s + i).normal(size=(T, N)) * (SIG0 if i % 2 == 0 else SIG2) for i in range(NS)]
+    noises = [make_season_world(777000 + 10000 * s + i, SIG0 if i % 2 == 0 else SIG2, fixed=True) for i in range(NS)]
     res = []
     for q in cands:
-        v = np.array([play_prefix(s, nz, q) for nz in noises]); tot = v.sum(1)
+        v = np.array([play_prefix(s, w["noise"], q, season=w) for w in noises]); tot = v.sum(1)
         res.append((tot.mean(), tot.std() / np.sqrt(NS), v.mean(0), q))
     res.sort(key=lambda x: -x[0])
     pn = pick_numbers(s, R); out = []
     for m, se, w, q in res[:KEEP]:
-        runs = [play(s, nz, forced=q) for nz in noises[:NF]]
+        runs = [play(s, w["noise"], forced=q, season=w, zmat=ZS) for w in noises[:NF]]
         fw = np.mean([r[0] for r in runs], axis=0); picks = np.array([r[1] for r in runs])
         fill = [dict(r=r + 1, pick=pn[r], t=[[NAMES[i], round(100 * n / NF)] for i, n in Counter(picks[:, r]).most_common(3)])
                 for r in range(len(q), len(q) + 4)]
         out.append(dict(names=[NAMES[i] for i in q], adp=[round(float(ADP[i]), 1) for i in q], c=round(float(m), 2),
                         se=round(float(se), 2), w=[int(round(100 * x)) for x in w],
-                        g=[int(round(10 * x)) for x in Z[list(q)].mean(0) - PAR[len(q)]],
+                        g=[int(round(10 * x)) for x in ZS[list(q)].mean(0) - PARS[len(q)]],
                         fill=fill, fw=[int(round(100 * x)) for x in fw]))
     return s, dict(pick=tree[str(s)]["pick"][:6], top=out)
 

@@ -25,6 +25,8 @@ for cp in ["config.json"] + sorted(glob.glob(os.path.join(ROOT, "config_*.json")
     tp = os.path.join(ROOT, "results", f"tree_{slug}.json"); top_p = os.path.join(ROOT, "results", f"top_{slug}.json")
     if os.path.exists(tp):
         html = rd("web", "tree_template.html").replace("__TREE__", open(tp).read()).replace("__LEAGUE__", name)
+        lp = os.path.join(ROOT, "results", f"live_{slug}.json")
+        html = html.replace("__LIVE__", open(lp).read() if os.path.exists(lp) else "null")
         html = html.replace("__TOP__", open(top_p).read() if os.path.exists(top_p) else "{}")
         open(os.path.join(ROOT, "dist", f"draft-tree-{slug}.html"), "w", encoding="utf-8").write(html); built.append(f"draft-tree-{slug}.html")
 print("built", ", ".join("dist/" + b for b in built))

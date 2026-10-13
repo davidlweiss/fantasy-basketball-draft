@@ -5,7 +5,7 @@ Every node gets up to BRANCH children for the next round, ranked 1..BRANCH:
   never do_not_draft / first_four_exclude). The best K_CAND by Fit are scored by simulating the draft only up to that round
   (opponents draft by ADP + noise; same random draws for every candidate) -- the rest of your draft is NOT simulated; the top BRANCH become children.
   Node 'c' = categories won (of 9) by the picks so far vs opponents' rosters of the same size (no later picks assumed);
-  'w' = % of opponents beaten in each category (CATS order); 'g' = 10 x (avg z of your picks - par for that many picks). Gaps under ~0.1 are ties.
+  'w' = % of opponents beaten in each category (CATS order); 'g' = 10 x (avg season-z of your picks - par for that many picks). Fixed rosters, games-played-aware (see draftlib.make_season_world(fixed=True)). Gaps under ~0.1 are ties.
   BRANCH=5 over rounds 2-6 -> 3,125 leaf paths per anchor, 31,250 in all.
 Run: python src/build_tree.py            (all anchors, ~20-30 min)
      python src/build_tree.py 1 6        (just those slots)
@@ -26,19 +26,19 @@ def candidates(s, seq):
     j = len(seq); P = pick_numbers(s, LV)[j]; mine = set(seq)
     cand = [ORDER[r] for r in range(window_start(P, j, mine), POOL)
             if ORDER[r] not in mine and not BLOCK[ORDER[r]] and ADP[ORDER[r]] <= P + REACH]
-    w = balanced_weights(Z[list(seq)].sum(0), j)
-    cand.sort(key=lambda p: -(Z[p] @ w))
+    w = balanced_weights(ZS[list(seq)].sum(0), j, PARS)
+    cand.sort(key=lambda p: -(ZS[p] @ w))
     return cand[:K_CAND]
 
-def evaluate(s, seq, noises):
-    """Per-category share of the 9 opponents your picks-so-far roster beats, vs their rosters of the same size
-    (play_prefix). Independent of whatever you would draft later."""
-    return np.mean([play_prefix(s, nz, seq) for nz in noises], axis=0)
+def evaluate(s, seq, worlds):
+    """Per-category win chance vs the other teams for your picks-so-far roster, against their rosters of the same size
+    (play_prefix, fixed-roster season model: per-game stats x projected games). Independent of later picks."""
+    return np.mean([play_prefix(s, w["noise"], seq, season=w) for w in worlds], axis=0)
 
 def build(s, seq, noises, win):
     node = dict(n=NAMES[seq[-1]], adp=round(float(ADP[seq[-1]]), 1), c=round(float(win.sum()), 2),
                 w=[int(round(100 * x)) for x in win],
-                g=[int(round(10 * x)) for x in Z[list(seq)].mean(0) - PAR[len(seq)]], k=[])
+                g=[int(round(10 * x)) for x in ZS[list(seq)].mean(0) - PARS[len(seq)]], k=[])
     if len(seq) == LV: return node
     scored = sorted(((evaluate(s, seq + (p,), noises), p) for p in candidates(s, seq)),
                     key=lambda t: -t[0].sum())[:BRANCH]
@@ -47,7 +47,7 @@ def build(s, seq, noises, win):
 
 def run_slot(s):
     t0 = time.time(); a = ANCHORS[s - 1]
-    noises = [np.random.default_rng(10000 * s + i).normal(size=(T, N)) * (SIG0 if i % 2 == 0 else SIG2) for i in range(NS)]
+    noises = [make_season_world(10000 * s + i, SIG0 if i % 2 == 0 else SIG2, fixed=True) for i in range(NS)]
     c0 = evaluate(s, (a,), noises)
     tree = build(s, (a,), noises, c0)
     return s, dict(pick=pick_numbers(s, LV), tree=tree, secs=round(time.time() - t0))

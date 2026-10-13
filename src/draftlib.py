@@ -152,11 +152,12 @@ def play(slot, noise, forced=(), punts=(), reach=REACH, season=None, catw=None, 
     mine = cats[me]; oth = np.delete(cats, me, 0)
     return ((mine > oth) + 0.5 * (mine == oth)).mean(0), picks
 
-def play_prefix(slot, noise, forced):
+def play_prefix(slot, noise, forced, season=None):
     """Draft only as far as your forced picks go (len(forced) rounds). Opponents take the lowest (ADP + noise) player.
     Returns the share of the 9 opponents your forced-pick roster beats in each category, comparing equal-size rosters
-    (your k players vs each opponent's k players). Nothing after your last forced pick is assumed."""
-    me = slot - 1; L = len(forced)
+    (your k players vs each opponent's k players). Nothing after your last forced pick is assumed.
+    With season=<make_season_world(..., fixed=True)> totals are per-game x projected games and results are win probabilities."""
+    me = slot - 1; L = len(forced); M = S if season is None else SS
     avail = np.ones(N, bool); reserved = np.zeros(N, bool); reserved[list(forced)] = True
     tot = np.zeros((T, 11)); cnt = 0
     for r in range(L):
@@ -165,7 +166,9 @@ def play_prefix(slot, noise, forced):
                 p = forced[cnt]; reserved[p] = False; cnt += 1
             else:
                 k = ADP + noise[t]; k[~avail | reserved] = 1e9; p = int(np.argmin(k))
-            avail[p] = False; tot[t] += S[p]
+            avail[p] = False; tot[t] += M[p]
+    if season is not None:
+        return season_win(season_cats(tot, season["vol"], season.get("gamma")) * SIGN, me, season["k"])
     cats = np.array([team_cats(tot[t]) for t in range(T)]) * SIGN
     mine = cats[me]; oth = np.delete(cats, me, 0)
     return ((mine > oth) + 0.5 * (mine == oth)).mean(0)
