@@ -96,24 +96,28 @@ SEASON = dict(
     lam=np.array([0.76, 1.00, 1.00, 1.00, 0.90, 0.54, 1.00]),      # share of it that is common to all categories (corr with PTS)
     k=np.array([6.0, 3.4, 1.45, 1.0, 1.05, 1.05, 1.75, 1.9, 1.25]),  # weekly noise / team spread: FG% FT% 3PM PTS REB AST STL BLK TO
     gamma=0.5,                                                     # share of draft-day roster differences that survives the season (waivers, trades)
+    cv=np.array([0.014, 0.020, 0.141, 0.148, 0.181, 0.158, 0.143, 0.240, 0.177]),   # real league spread (std/mean) of team totals, per category
 )
 VOL_COL = np.array([1, 1, 1, 1, 0, 1, 2, 3, 4, 5, 6])              # which volume column scales each of the 11 stat columns
 
-def make_season_world(seed, sig_adp):
-    """Opponent ADP noise (as before) plus per-team volume multipliers; returns a dict you pass as play(season=...)."""
+def make_season_world(seed, sig_adp, fixed=False):
+    """Opponent ADP noise (as before) plus per-team volume multipliers; returns a dict you pass as play(season=...).
+    fixed=True: rosters stay exactly as drafted all season (no volume factor, no waiver/trade fade): totals are just
+    per-game stats x projected games. Weekly matchup noise is still applied (see season_win)."""
     rng = np.random.default_rng(seed)
     noise = rng.normal(size=(T, N)) * sig_adp
     g = rng.normal(size=(T, 1)); e = rng.normal(size=(T, 7)); sg, lam = SEASON["sig"], SEASON["lam"]
-    vol = np.exp(sg * (lam * g + np.sqrt(1 - lam ** 2) * e) - 0.5 * sg ** 2)
-    return dict(noise=noise, vol=vol, k=SEASON["k"])
+    vol = np.ones((T, 7)) if fixed else np.exp(sg * (lam * g + np.sqrt(1 - lam ** 2) * e) - 0.5 * sg ** 2)
+    return dict(noise=noise, vol=vol, k=SEASON["k"], gamma=1.0 if fixed else SEASON["gamma"])
 
-def season_cats(tot, vol):
-    m = tot.mean(0); t = (m + SEASON["gamma"] * (tot - m)) * vol[:, VOL_COL]
+def season_cats(tot, vol, gamma=None):
+    gamma = SEASON["gamma"] if gamma is None else gamma
+    m = tot.mean(0); t = (m + gamma * (tot - m)) * vol[:, VOL_COL]
     return np.column_stack([t[:, 0] / t[:, 1], t[:, 2] / t[:, 3], t[:, 4], t[:, 5], t[:, 6], t[:, 7], t[:, 8], t[:, 9], t[:, 10]])
 
 def season_win(cats, me, k):
     """Chance of beating each opponent per category, averaged over the T-1 opponents. cats are signed so higher is better."""
-    d = (cats[me] - np.delete(cats, me, 0)) / (k * cats.std(0))
+    d = (cats[me] - np.delete(cats, me, 0)) / (k * SEASON["cv"] * np.abs(cats.mean(0)))     # weekly noise has a fixed size (real spread x k)
     return (0.5 * (1 + np.tanh(0.7978845608 * (d + 0.044715 * d ** 3)))).mean(0)
 
 def play(slot, noise, forced=(), punts=(), reach=REACH, season=None, catw=None, zmat=None):
@@ -143,7 +147,7 @@ def play(slot, noise, forced=(), punts=(), reach=REACH, season=None, catw=None, 
                 k = ADP + noise[t]; k[~avail | reserved] = 1e9; p = int(np.argmin(k))
             avail[p] = False; tot[t] += M[p]
     if season is not None:
-        return season_win(season_cats(tot, season["vol"]) * SIGN, me, season["k"]), picks
+        return season_win(season_cats(tot, season["vol"], season.get("gamma")) * SIGN, me, season["k"]), picks
     cats = np.array([team_cats(tot[t]) for t in range(T)]) * SIGN
     mine = cats[me]; oth = np.delete(cats, me, 0)
     return ((mine > oth) + 0.5 * (mine == oth)).mean(0), picks
