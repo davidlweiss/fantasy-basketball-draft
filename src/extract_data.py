@@ -1,11 +1,11 @@
 """Read the projections workbook and write data/players.json.
 
 players.json = {"p": [[name, rank, last_year_rank, adp, do_not_draft, fgm, fga, ftm, fta,
-                       3pm, pts, reb, ast, stl, blk, to], ...],
+                       3pm, pts, reb, ast, stl, blk, to, gp, mpg], ...],   # gp/mpg: projected games and minutes (data/games_played.csv)
                 "t": {name: "3-4", ...}}   # starting round targets from the 'real draft' tab
 Run:  python src/extract_data.py
 """
-import json, os, re, warnings
+import csv, json, os, re, unicodedata, warnings
 import openpyxl
 warnings.filterwarnings("ignore")
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
@@ -28,6 +28,20 @@ for r in ws.iter_rows(min_row=2, values_only=True):
         continue
     players.append([r[1], r[2], num(r[3]), num(r[4]), int(bool(r[6])), fgm, fga, ftm, fta,
                     r[9], r[10], r[11], r[12], r[13], r[14], r[15]])
+
+# projected games played / minutes per game, appended as the last two columns (None when a player is not in the file)
+norm_gp = lambda s: re.sub(r"[^a-z0-9]", "", unicodedata.normalize("NFKD", s).encode("ascii", "ignore").decode().lower())
+gp_path = os.path.join(ROOT, "data", "games_played.csv")
+gp = {}
+if os.path.exists(gp_path):
+    for row in csv.DictReader(open(gp_path, encoding="utf-8")):
+        gp[norm_gp(row["name"])] = (float(row["gp"]), float(row["mpg"]))
+missing_gp = []
+for p in players:
+    g = gp.get(norm_gp(p[0]))
+    if g is None: missing_gp.append(p[0])
+    p.extend(g if g else (None, None))
+if gp: print(f"games played/minutes attached to {len(players) - len(missing_gp)} of {len(players)} players; missing: {missing_gp}")
 
 # starting target lists: the 'real draft' tab, column L, grouped by 'Rds1-2' style headers
 cur, groups = None, {}
