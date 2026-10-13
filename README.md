@@ -34,3 +34,8 @@ First four: enumerate every reachable 4-player set assuming others take best ADP
 - Ranking uses ONLY the picks made so far (`play_prefix`: your k players vs each opponent's k players, win % per category). Later rounds are not assumed. "Emphasize later" = categories where your players sit furthest behind par; "typical fill" is guidance from simulating the Fit rule and does not affect ranking.
 - `do_not_draft` (config) = players you never pick; opponents still take them.
 - `results/plan6.json` / `build_plan6.py` is an earlier beam-search version (ranked with an assumed fill).
+
+## Season model (calibrated to the league's real standings)
+- `data/games_played.csv` -> projected games/minutes appended to each `players.json` row (cols 16-17). `ZS` in `draftlib.py` = z-scores on season totals (per-game x games).
+- `play(..., season=make_season_world(seed, sig))` simulates season totals with per-team "volume" multipliers (games played / active roster / streaming) and noisy weekly category results. Parameters (`SEASON` in `draftlib.py`) are fitted by `python src/calibrate_season.py` to the 10-team standings (spreads and correlations match; draft-survival `gamma=0.5` is an assumption the data cannot pin down).
+- Default `play()` behaviour (no `season=`) is unchanged, so older results still reproduce.

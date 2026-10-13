@@ -37,12 +37,27 @@ def zscores(pool=POOL):
     return Z
 Z = zscores()
 
+def zscores_season(pool=POOL):
+    """Like zscores() but on season totals (per-game x projected games), so durable players are worth more."""
+    top = np.argsort(RK)[:pool]
+    fgR = SS_[top, 0].sum() / SS_[top, 1].sum(); ftR = SS_[top, 2].sum() / SS_[top, 3].sum()
+    fgi, fti = SS_[:, 0] - fgR * SS_[:, 1], SS_[:, 2] - ftR * SS_[:, 3]
+    Zs = np.zeros((N, 9)); Zs[:, 0] = fgi / fgi[top].std(); Zs[:, 1] = fti / fti[top].std()
+    for k in range(7):
+        c = SS_[:, 4 + k]; z = (c - c[top].mean()) / c[top].std(); Zs[:, 2 + k] = -z if k == 6 else z
+    return Zs
+
 ORDER = [int(i) for i in np.argsort(ADP, kind="stable")]          # players by ADP
 _oa = np.argsort(ADP)
 # par[n]: average z of the players an average team holds after n picks (top T*n by ADP)
 PAR = [None] + [Z[_oa[:min(N, T * n)]].mean(0) for n in range(1, R + 1)]
 S = np.column_stack([FGM, FGA, FTM, FTA, C])                       # per-player stat rows for team totals
+GP = np.array([r[16] if len(r) > 16 and r[16] else 70.0 for r in _d], float)    # projected games played (data/games_played.csv)
+SS = S * GP[:, None]                                               # per-player season totals = per-game stats x projected games
 SIGN = np.array([1, 1, 1, 1, 1, 1, 1, 1, -1])
+SS_ = SS
+ZS = zscores_season()                                              # season-total z-scores (games-played aware)
+PARS = [None] + [ZS[np.argsort(ADP)[:min(N, T * n)]].mean(0) for n in range(1, R + 1)]
 SIG0 = 2 + 0.12 * np.minimum(ADP, 200)                             # 'tight' opponents: ADP + modest noise
 SIG2 = 4 + 0.25 * np.minimum(ADP, 200)                             # 'loose' opponents: roughly double the noise
 
@@ -68,18 +83,48 @@ def make_noise(slot, k):
     """k noise matrices for a slot, alternating tight/loose opponents (same draws reused across foursomes)."""
     return [np.random.default_rng(10000 * slot + i).normal(size=(T, N)) * (SIG0 if i % 2 == 0 else SIG2) for i in range(k)]
 
-def balanced_weights(zsum, cnt):
+def balanced_weights(zsum, cnt, par=None):
     """weight = 1 - 0.5 * (your average z - par), kept in [0.4, 1.8]. This is the board's 'Fit' rule."""
-    return np.clip(1 - 0.5 * (zsum / cnt - PAR[cnt]), 0.4, 1.8)
+    return np.clip(1 - 0.5 * (zsum / cnt - (PAR if par is None else par)[cnt]), 0.4, 1.8)
 
-def play(slot, noise, forced=(), punts=(), reach=REACH):
+# ---- season model (opt-in via play(..., season=world)): calibrated to the league's last-season standings ----------------
+# Teams get a random 'volume' multiplier (games played / active roster / streaming) that moves their counting stats
+# together, and a category is won with probability Phi(edge / (k x spread of teams)) instead of by strict rank, because
+# weekly results are noisy (FG% and FT% most of all). sig/lam/k are fitted by src/calibrate_season.py.
+SEASON = dict(
+    sig=np.array([0.131, 0.153, 0.183, 0.157, 0.146, 0.257, 0.183]),      # sd of log volume multiplier: 3PM PTS REB AST STL BLK TO
+    lam=np.array([0.76, 1.00, 1.00, 1.00, 0.90, 0.54, 1.00]),      # share of it that is common to all categories (corr with PTS)
+    k=np.array([6.0, 3.4, 1.45, 1.0, 1.05, 1.05, 1.75, 1.9, 1.25]),  # weekly noise / team spread: FG% FT% 3PM PTS REB AST STL BLK TO
+    gamma=0.5,                                                     # share of draft-day roster differences that survives the season (waivers, trades)
+)
+VOL_COL = np.array([1, 1, 1, 1, 0, 1, 2, 3, 4, 5, 6])              # which volume column scales each of the 11 stat columns
+
+def make_season_world(seed, sig_adp):
+    """Opponent ADP noise (as before) plus per-team volume multipliers; returns a dict you pass as play(season=...)."""
+    rng = np.random.default_rng(seed)
+    noise = rng.normal(size=(T, N)) * sig_adp
+    g = rng.normal(size=(T, 1)); e = rng.normal(size=(T, 7)); sg, lam = SEASON["sig"], SEASON["lam"]
+    vol = np.exp(sg * (lam * g + np.sqrt(1 - lam ** 2) * e) - 0.5 * sg ** 2)
+    return dict(noise=noise, vol=vol, k=SEASON["k"])
+
+def season_cats(tot, vol):
+    m = tot.mean(0); t = (m + SEASON["gamma"] * (tot - m)) * vol[:, VOL_COL]
+    return np.column_stack([t[:, 0] / t[:, 1], t[:, 2] / t[:, 3], t[:, 4], t[:, 5], t[:, 6], t[:, 7], t[:, 8], t[:, 9], t[:, 10]])
+
+def season_win(cats, me, k):
+    """Chance of beating each opponent per category, averaged over the T-1 opponents. cats are signed so higher is better."""
+    d = (cats[me] - np.delete(cats, me, 0)) / (k * cats.std(0))
+    return (0.5 * (1 + np.tanh(0.7978845608 * (d + 0.044715 * d ** 3)))).mean(0)
+
+def play(slot, noise, forced=(), punts=(), reach=REACH, season=None, catw=None, zmat=None):
     """Simulate one full snake draft. Opponents take the lowest (ADP + noise) player. You take `forced`
     players first (held back from opponents until your turn), then the best-scoring player by the balanced rule.
-    Returns (share of the 9 opponents beaten per category, your picks in order)."""
-    me = slot - 1
+    Returns (share of the 9 opponents beaten per category, your picks in order). With season=<make_season_world(...)> the teams'
+    totals are season totals (per-game x games) with volume multipliers, and the result is a win probability per category."""
+    me = slot - 1; M = S if season is None else SS; ZM = Z if zmat is None else zmat
     avail = np.ones(N, bool); reserved = np.zeros(N, bool); reserved[list(forced)] = True
     tot = np.zeros((T, 11)); zsum = np.zeros(9); cnt = 0; pickno = 0; picks = []
-    wbase = np.ones(9)
+    wbase = np.ones(9) if catw is None else np.array(catw, float)       # catw: fixed per-category emphasis (e.g. de-emphasise FG%/FT%, ignore TO)
     for j in punts: wbase[j] = 0
     for r in range(R):
         for t in (range(T) if r % 2 == 0 else range(T - 1, -1, -1)):
@@ -88,15 +133,17 @@ def play(slot, noise, forced=(), punts=(), reach=REACH):
                 if cnt < len(forced):
                     p = forced[cnt]; reserved[p] = False
                 else:
-                    w = (balanced_weights(zsum, cnt) if cnt > 0 else 1.0) * wbase
-                    sc = Z @ w; sc[~avail | DND | reserved | (ADP > pickno + reach)] = -1e9
+                    w = (balanced_weights(zsum, cnt, None if zmat is None else PARS) if cnt > 0 else 1.0) * wbase
+                    sc = ZM @ w; sc[~avail | DND | reserved | (ADP > pickno + reach)] = -1e9
                     if sc.max() <= -1e8:                      # nobody within reach: take best available
-                        sc = Z @ w; sc[~avail | DND | reserved] = -1e9
+                        sc = ZM @ w; sc[~avail | DND | reserved] = -1e9
                     p = int(np.argmax(sc))
-                zsum += Z[p]; cnt += 1; picks.append(p)
+                zsum += ZM[p]; cnt += 1; picks.append(p)
             else:
                 k = ADP + noise[t]; k[~avail | reserved] = 1e9; p = int(np.argmin(k))
-            avail[p] = False; tot[t] += S[p]
+            avail[p] = False; tot[t] += M[p]
+    if season is not None:
+        return season_win(season_cats(tot, season["vol"]) * SIGN, me, season["k"]), picks
     cats = np.array([team_cats(tot[t]) for t in range(T)]) * SIGN
     mine = cats[me]; oth = np.delete(cats, me, 0)
     return ((mine > oth) + 0.5 * (mine == oth)).mean(0), picks
